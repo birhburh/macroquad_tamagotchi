@@ -1,0 +1,6 @@
+assets_src/*.tgs
+assets_src/*.gif
+assets_src/*.png
+assets_src/*.json
+.DS_Store
+assets/*.gif
