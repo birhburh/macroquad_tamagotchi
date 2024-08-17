@@ -1,0 +1,13 @@
+[package]
+name = "macroquad_tamagotchi"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+macroquad = "0.4"
+glam = {version = "0.27.0", features = ["scalar-math"] } # to conform to macroquad
+euclid = "0.22.7"
+# "nanoserde" = {version = "0.2.0-beta.0", default-features = false, features = ["std", "json"]}
+"nanoserde" = {path="../nanoserde", default-features = false, features = ["std", "json"]}
+# serde = { version = "1.0", features = ["derive"] }
+# serde_json = "1.0"
