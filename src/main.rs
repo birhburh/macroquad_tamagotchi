@@ -6,10 +6,6 @@ use {
     std::fs,
 };
 
-struct TestData {
-
-}
-
 fn main() {
     // let data = fs::read_to_string("pylottie_ball.json").expect("Unable to read file");
     let data = fs::read_to_string("test.json").expect("Unable to read file");
@@ -24,5 +20,6 @@ fn main() {
     dbg!(&ns_model);
     let ns_ser_model = SerJson::serialize_json(&ns_model);
     println!("nanoserde ser: {}", ns_ser_model);
+
     assert_eq!(s_ser_model, ns_ser_model);
 }
