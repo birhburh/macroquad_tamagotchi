@@ -4,7 +4,8 @@
 // - implement ((serialize|deserialize)_)?with
 // - implement untagged for enum
 // - implement flatten for attribute
-// - imlemnet tag attribute for enum
+// - implemnet tag attribute for enum
+// - implement skip_serializing_if = "Option::is_none")
 
 use {
     nanoserde::{DeJson, DeJsonTok, SerJson}, std::{fmt::Debug, vec}
