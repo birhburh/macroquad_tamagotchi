@@ -6,23 +6,279 @@
 // - implement flatten for attribute
 // - implemnet tag attribute for enum
 // - implement skip_serializing_if = "Option::is_none")
+// - Fix error "cannot add `{integer}` to `&model::Animated<Vec<model::Bezier>>`" when struct field name is 'd'
+// - Implement something similar to serde_repr::Serialize_repr, serde_repr::Deserialize_repr
 
 use {
-    nanoserde::{DeJson, DeJsonTok, SerJson}, std::{fmt::Debug, vec}
+    nanoserde::{DeJson, DeJsonErr, DeJsonState, DeJsonTok, SerJson, SerJsonState},
+    std::{fmt::Debug, vec},
 };
+
+#[derive(Clone, Debug)]
+pub enum Value {
+    Primitive(f32),
+    List(Vec<f32>),
+    Bezier(Bezier),
+    ComplexBezier(Vec<Bezier>),
+    TextDocument(TextDocument),
+}
+
+impl Value {
+    pub(crate) fn as_f32_vec(&self) -> Option<Vec<f32>> {
+        Some(match self {
+            Value::Primitive(p) => vec![*p],
+            Value::List(l) => l.clone(),
+            _ => return None,
+        })
+    }
+}
+
+impl DeJson for Value {
+    fn de_json(s: &mut DeJsonState, i: &mut core::str::Chars) -> Result<Self, DeJsonErr> {
+        println!("de_json for Value");
+        dbg!(&s.tok);
+        match s.tok {
+            DeJsonTok::U64(v) => {
+                s.next_tok(i)?;
+                Ok(Self::Primitive(v as f32))
+            }
+            DeJsonTok::BlockOpen => {
+                s.next_tok(i)?;
+                dbg!(&s.tok);
+                match s.tok {
+                    DeJsonTok::F64(v) => {
+                        let mut res = vec![v as f32];
+                        s.next_tok(i)?;
+                        s.eat_comma_block(i)?;
+
+                        while s.tok != DeJsonTok::BlockClose {
+                            res.push(DeJson::de_json(s, i)?);
+                            s.eat_comma_block(i)?;
+                        }
+                        s.block_close(i)?;
+                        dbg!(&res);
+                        Ok(Self::List(res))
+                    }
+                    DeJsonTok::U64(v) => {
+                        let mut res = vec![v as f32];
+                        s.next_tok(i)?;
+                        s.eat_comma_block(i)?;
+
+                        while s.tok != DeJsonTok::BlockClose {
+                            res.push(DeJson::de_json(s, i)?);
+                            s.eat_comma_block(i)?;
+                        }
+                        s.block_close(i)?;
+                        dbg!(&res);
+                        Ok(Self::List(res))
+                    }
+                    DeJsonTok::CurlyOpen => {
+                        let mut res = vec![DeJson::de_json(s, i)?];
+
+                        while s.tok != DeJsonTok::BlockClose {
+                            res.push(DeJson::de_json(s, i)?);
+                            s.eat_comma_block(i)?;
+                        }
+                        s.block_close(i)?;
+                        dbg!(&res);
+                        Ok(Self::ComplexBezier(res))
+                    }
+                    _ => Err(s.err_token("U64 or {")),
+                }
+            }
+            _ => Err(s.err_token("U64 or [")),
+        }
+    }
+}
+
+impl SerJson for Value {
+    fn ser_json(&self, d: usize, s: &mut SerJsonState) {
+        match self {
+            Self::Primitive(f0) => {
+                f0.ser_json(d, s);
+            }
+            Self::List(f0) => {
+                f0.ser_json(d, s);
+            }
+            _ => todo!(),
+        }
+    }
+}
+
+#[derive(DeJson, SerJson, Debug, Clone)]
+pub struct TextDocument {
+    #[nserde(rename = "t")]
+    pub value: String,
+    #[nserde(rename = "f")]
+    pub font_name: String,
+    #[nserde(rename = "s")]
+    pub size: f32,
+    #[nserde(
+        rename = "fc",
+        deserialize_with = "array_to_rgba",
+        serialize_with = "array_from_rgba",
+        default
+    )]
+    pub fill_color: Rgba,
+    #[nserde(
+        rename = "sc",
+        deserialize_with = "array_to_rgba",
+        serialize_with = "array_from_rgba",
+        default
+    )]
+    stroke_color: Rgba,
+    #[nserde(rename = "sw", default)]
+    stroke_width: f32,
+    #[nserde(rename = "of", default)]
+    stroke_above_fill: bool,
+    #[nserde(rename = "lh", default)]
+    line_height: Option<f32>,
+    #[nserde(rename = "j", default)]
+    pub justify: TextJustify,
+    #[nserde(rename = "ls", default)]
+    pub baseline_shift: f32,
+    // TODO:
+    #[nserde(default)]
+    sz: Vec<f32>,
+    #[nserde(default)]
+    ps: Vec<f32>,
+    #[nserde(default)]
+    ca: TextCaps,
+}
+
+impl Default for TextDocument {
+    fn default() -> Self {
+        TextDocument {
+            font_name: String::new(),
+            size: 14.0,
+            fill_color: Rgba::new_u8(0, 0, 0, 255),
+            stroke_color: Rgba::new_u8(0, 0, 0, 255),
+            stroke_width: 0.0,
+            stroke_above_fill: false,
+            line_height: None,
+            baseline_shift: 0.0,
+            value: String::new(),
+            justify: TextJustify::Left,
+            sz: vec![],
+            ps: vec![],
+            ca: TextCaps::Regular,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+#[repr(u8)]
+pub enum TextJustify {
+    Left = 0,
+    Right = 1,
+    Center = 2,
+    LastLineLeft = 3,
+    LastLineRight = 4,
+    LastLineCenter = 5,
+    LastLineFull = 6,
+}
+
+impl Default for TextJustify {
+    fn default() -> Self {
+        TextJustify::Left
+    }
+}
+
+impl DeJson for TextJustify {
+    fn de_json(s: &mut DeJsonState, i: &mut std::str::Chars) -> Result<Self, DeJsonErr> {
+        println!("de_json for TextJustify");
+
+        match s.tok {
+            DeJsonTok::U64(_) => {
+                let r = s.as_f64()? as u8;
+                s.next_tok(i)?;
+                match r {
+                    0 => Ok(Self::Left),
+                    1 => Ok(Self::Right),
+                    2 => Ok(Self::Center),
+                    3 => Ok(Self::LastLineLeft),
+                    4 => Ok(Self::LastLineRight),
+                    5 => Ok(Self::LastLineCenter),
+                    6 => Ok(Self::LastLineFull),
+                    _ => Err(s.err_range("0..6")),
+                }
+            }
+            _ => Err(s.err_token("F64")),
+        }
+    }
+}
+
+impl SerJson for TextJustify {
+    fn ser_json(&self, d: usize, s: &mut SerJsonState) {
+        match self {
+            Self::Left => 0.ser_json(d, s),
+            Self::Right => 1.ser_json(d, s),
+            Self::Center => 2.ser_json(d, s),
+            Self::LastLineLeft => 3.ser_json(d, s),
+            Self::LastLineRight => 4.ser_json(d, s),
+            Self::LastLineCenter => 5.ser_json(d, s),
+            Self::LastLineFull => 6.ser_json(d, s),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+#[repr(u8)]
+pub enum TextCaps {
+    Regular = 0,
+    AllCaps = 1,
+    SmallCaps = 2,
+}
+
+impl Default for TextCaps {
+    fn default() -> Self {
+        TextCaps::Regular
+    }
+}
+
+impl DeJson for TextCaps {
+    fn de_json(s: &mut DeJsonState, i: &mut std::str::Chars) -> Result<Self, DeJsonErr> {
+        println!("de_json for TextCaps");
+
+        match s.tok {
+            DeJsonTok::U64(_) => {
+                let r = s.as_f64()? as u8;
+                s.next_tok(i)?;
+                match r {
+                    0 => Ok(Self::Regular),
+                    1 => Ok(Self::AllCaps),
+                    2 => Ok(Self::SmallCaps),
+                    _ => Err(s.err_range("0..2")),
+                }
+            }
+            _ => Err(s.err_token("F64")),
+        }
+    }
+}
+
+impl SerJson for TextCaps {
+    fn ser_json(&self, d: usize, s: &mut SerJsonState) {
+        match self {
+            Self::Regular => 0.ser_json(d, s),
+            Self::AllCaps => 1.ser_json(d, s),
+            Self::SmallCaps => 2.ser_json(d, s),
+        }
+    }
+}
 
 pub trait FromTo<T> {
     fn from(v: T) -> Self;
     fn to(self) -> T;
 }
 
-impl FromTo<Vec<f32>> for f32 {
-    fn from(v: Vec<f32>) -> Self {
+impl FromTo<Value> for f32 {
+    fn from(v: Value) -> Self {
+        let v = v.as_f32_vec().unwrap();
         v[0]
     }
 
-    fn to(self) -> Vec<f32> {
-        todo!();
+    fn to(self) -> Value {
+        Value::Primitive(self)
     }
 }
 
@@ -85,17 +341,19 @@ mod vector_2_d {
 
 type Vector2D = vector_2_d::Vector2D<f32>;
 
-impl FromTo<Vec<f32>> for Vector2D {
-    fn from(v: Vec<f32>) -> Self {
-        Vector2D::new(v[0].clone().into(), v.get(1).cloned().unwrap_or(0.0))
+impl FromTo<Value> for Vector2D {
+    fn from(v: Value) -> Self {
+        let v = v.as_f32_vec().unwrap();
+        Vector2D::new(v[0], v.get(1).cloned().unwrap_or(0.0))
     }
 
-    fn to(self) -> Vec<f32> {
-        todo!();
+    fn to(self) -> Value {
+        todo!()
     }
 }
 
 #[derive(SerJson, DeJson, Debug, Clone)]
+#[nserde(serialize_none_as_null)]
 pub struct Model {
     #[nserde(rename = "nm")]
     pub name: Option<String>,
@@ -112,14 +370,100 @@ pub struct Model {
     #[nserde(rename = "h")]
     pub height: u32,
     pub layers: Vec<Layer>,
-    // #[nserde(default)]
-    // pub assets: Vec<Asset>,
-    // #[nserde(default)]
-    // pub fonts: FontList,
+    #[nserde(default)]
+    pub assets: Vec<Asset>,
+    #[nserde(default)]
+    pub fonts: FontList,
+}
+
+#[derive(SerJson, DeJson, Debug, Clone)]
+// #[nserde(untagged)]
+pub enum Asset {
+    Media(Media),
+    Sound,
+    Precomposition(Precomposition),
+}
+
+#[derive(SerJson, DeJson, Debug, Clone)]
+pub struct Precomposition {
+    pub id: String,
+    pub layers: Vec<Layer>,
+    #[nserde(rename = "nm")]
+    name: Option<String>,
+    #[nserde(rename = "fr")]
+    pub frame_rate: Option<f32>,
+}
+
+#[derive(SerJson, DeJson, Debug, Clone, Default)]
+pub struct FontList {
+    pub list: Vec<Font>,
+}
+
+#[derive(SerJson, DeJson, Debug, Clone)]
+pub struct Font {
+    #[nserde(default)]
+    ascent: Option<f32>,
+    #[nserde(rename = "fFamily")]
+    pub family: String,
+    #[nserde(rename = "fName")]
+    pub name: String,
+    #[nserde(rename = "fStyle")]
+    style: String,
+    #[nserde(rename = "fPath", default)]
+    pub path: Option<String>,
+    #[nserde(rename = "fWeight")]
+    weight: Option<String>,
+    #[nserde(default)]
+    pub origin: FontPathOrigin,
+    #[nserde(rename = "fClass", default)]
+    class: Option<String>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Default)]
+#[repr(u8)]
+pub enum FontPathOrigin {
+    #[default]
+    Local = 0,
+    CssUrl = 1,
+    ScriptUrl = 2,
+    FontUrl = 3,
+}
+
+impl DeJson for FontPathOrigin {
+    fn de_json(s: &mut DeJsonState, i: &mut std::str::Chars) -> Result<Self, DeJsonErr> {
+        println!("de_json for FontPathOrigin");
+
+        match s.tok {
+            DeJsonTok::U64(_) => {
+                let r = s.as_f64()? as u8;
+                s.next_tok(i)?;
+                match r {
+                    0 => Ok(Self::Local),
+                    1 => Ok(Self::CssUrl),
+                    2 => Ok(Self::ScriptUrl),
+                    3 => Ok(Self::FontUrl),
+                    _ => Err(s.err_range("0..3")),
+                }
+            }
+            _ => Err(s.err_token("F64")),
+        }
+    }
+}
+
+impl SerJson for FontPathOrigin {
+    fn ser_json(&self, d: usize, s: &mut SerJsonState) {
+        match self {
+            Self::Local => 0.ser_json(d, s),
+            Self::CssUrl => 1.ser_json(d, s),
+            Self::ScriptUrl => 2.ser_json(d, s),
+            Self::FontUrl => 3.ser_json(d, s),
+        }
+    }
 }
 
 #[derive(PartialEq, Debug, DeJson, SerJson)]
 #[nserde(transparent)]
+// deserialize_with = "bool_from_int"
 pub struct BoolFromInt(u32);
 
 impl From<&bool> for BoolFromInt {
@@ -164,9 +508,9 @@ pub struct Layer {
 impl DeJson for Layer {
     #[allow(clippy::ignored_unit_patterns)]
     fn de_json(
-        s: &mut nanoserde::DeJsonState,
+        s: &mut DeJsonState,
         i: &mut core::str::Chars,
-    ) -> ::core::result::Result<Self, nanoserde::DeJsonErr> {
+    ) -> ::core::result::Result<Self, DeJsonErr> {
         println!("de_json for Layer\n");
         ::core::result::Result::Ok({
             let mut _is_3d = None;
@@ -401,7 +745,7 @@ impl DeJson for Layer {
 }
 
 impl SerJson for Layer {
-    fn ser_json(&self, d: usize, s: &mut nanoserde::SerJsonState) {
+    fn ser_json(&self, d: usize, s: &mut SerJsonState) {
         s.st_pre();
         let mut first_field_was_serialized = false;
         if first_field_was_serialized {
@@ -541,6 +885,32 @@ pub struct Rgba {
     pub a: u8,
 }
 
+impl Rgba {
+    pub fn new_f32(r: f32, g: f32, b: f32, a: f32) -> Rgba {
+        Rgba {
+            r: (r * 255.0) as u8,
+            g: (g * 255.0) as u8,
+            b: (b * 255.0) as u8,
+            a: (a * 255.0) as u8,
+        }
+    }
+
+    pub fn new_u8(r: u8, g: u8, b: u8, a: u8) -> Rgba {
+        Rgba { r, g, b, a }
+    }
+}
+
+impl Default for Rgba {
+    fn default() -> Self {
+        Self {
+            r: 0,
+            g: 0,
+            b: 0,
+            a: 255,
+        }
+    }
+}
+
 #[derive(SerJson, DeJson, Debug, Clone)]
 pub struct MediaRef {
     #[nserde(rename = "refId")]
@@ -560,7 +930,7 @@ pub struct ShapeLayer {
 }
 
 impl SerJson for ShapeLayer {
-    fn ser_json(&self, d: usize, s: &mut nanoserde::SerJsonState) {
+    fn ser_json(&self, d: usize, s: &mut SerJsonState) {
         s.st_pre();
         let mut first_field_was_serialized = false;
         if first_field_was_serialized {
@@ -584,6 +954,7 @@ impl SerJson for ShapeLayer {
         }
         first_field_was_serialized = true;
         s.field(d + 1, "ty");
+        dbg!(&self.shape);
         match &self.shape {
             Shape::Rectangle(_) => String::ser_json(&"rc".into(), d + 1, s),
             Shape::Ellipse(ellipse) => {
@@ -640,23 +1011,59 @@ impl SerJson for ShapeLayer {
                 s.field(d + 1, "sa");
                 transform.skew_axis.ser_json(d + 1, s);
             }
+            Shape::Path { data, .. } => {
+                String::ser_json(&"sh".into(), d + 1, s);
+                s.conl();
+                s.field(d + 1, "ks");
+                data.ser_json(d + 1, s);
+            }
+            Shape::Stroke(stroke) => {
+                String::ser_json(&"st".into(), d + 1, s);
+                s.conl();
+                s.field(d + 1, "lc");
+                stroke.line_cap.ser_json(d + 1, s);
+                s.conl();
+                s.field(d + 1, "lj");
+                stroke.line_join.ser_json(d + 1, s);
+                s.conl();
+                s.field(d + 1, "ml");
+                stroke.miter_limit.ser_json(d + 1, s);
+                s.conl();
+                s.field(d + 1, "o");
+                stroke.opacity.ser_json(d + 1, s);
+                s.conl();
+                s.field(d + 1, "w");
+                stroke.width.ser_json(d + 1, s);
+                s.conl();
+                s.field(d + 1, "d");
+                stroke.dashes.ser_json(d + 1, s);
+                s.conl();
+                s.field(d + 1, "c");
+                stroke.color.ser_json(d + 1, s);
+            }
             _ => unreachable!(),
         }
         s.st_post(d);
     }
 }
 
+fn de_unreachable(s: &mut DeJsonState) {
+    panic!("Should not be here!: {}:{}", s.line, s.col);
+}
+
 impl DeJson for ShapeLayer {
     #[allow(clippy::ignored_unit_patterns)]
     fn de_json(
-        s: &mut nanoserde::DeJsonState,
+        s: &mut DeJsonState,
         i: &mut core::str::Chars,
-    ) -> ::core::result::Result<Self, nanoserde::DeJsonErr> {
+    ) -> ::core::result::Result<Self, DeJsonErr> {
         println!("de_json for ShapeLayer");
         ::core::result::Result::Ok({
             let mut _name = None;
             let mut _hidden = None;
             let mut _shape = None;
+            let mut _direction = None;
+            let mut _dashes = None;
             s.curly_open(i)?;
             while let Some(_) = s.next_str() {
                 dbg!(&s.strbuf);
@@ -677,22 +1084,42 @@ impl DeJson for ShapeLayer {
                             match AsRef::<str>::as_ref(&s.strbuf) {
                                 "rc" => {
                                     println!("sub de_json for Rectangle");
-                                    match _shape.as_ref() {
+                                    match _shape.as_mut() {
                                         None => {
-                                            _shape = Some(Shape::Rectangle(Default::default()));
+                                            let mut rect = Rectangle::default();
+                                            if let Some(direction) = _direction {
+                                                rect.direction = direction;
+                                                _direction = None;
+                                            }
+                                            _shape = Some(Shape::Rectangle(rect));
                                         }
-                                        Some(Shape::Rectangle(_)) => (),
-                                        _ => unreachable!(),
+                                        Some(Shape::Rectangle(rect)) => {
+                                            if let Some(direction) = _direction {
+                                                rect.direction = direction;
+                                                _direction = None;
+                                            }
+                                        }
+                                        _ => return Err(s.err_nf("start_time")),
                                     }
                                 }
                                 "el" => {
                                     println!("sub de_json for Ellipse");
-                                    match _shape.as_ref() {
+                                    match _shape.as_mut() {
                                         None => {
-                                            _shape = Some(Shape::Ellipse(Default::default()));
+                                            let mut ellipse = Ellipse::default();
+                                            if let Some(direction) = _direction {
+                                                ellipse.direction = direction;
+                                                _direction = None;
+                                            }
+                                            _shape = Some(Shape::Ellipse(ellipse));
                                         }
-                                        Some(Shape::Ellipse(_)) => (),
-                                        _ => unreachable!(),
+                                        Some(Shape::Ellipse(ellipse)) => {
+                                            if let Some(direction) = _direction {
+                                                ellipse.direction = direction;
+                                                _direction = None;
+                                            }
+                                        }
+                                        _ => de_unreachable(s),
                                     }
                                 }
                                 "gr" => {
@@ -703,8 +1130,8 @@ impl DeJson for ShapeLayer {
                                                 shapes: Default::default(),
                                             });
                                         }
-                                        Some(Shape::Group {..}) => (),
-                                        _ => unreachable!(),
+                                        Some(Shape::Group { .. }) => (),
+                                        _ => de_unreachable(s),
                                     }
                                 }
                                 "fl" => {
@@ -713,8 +1140,8 @@ impl DeJson for ShapeLayer {
                                         None => {
                                             _shape = Some(Shape::Fill(Default::default()));
                                         }
-                                        Some(Shape::Fill {..}) => (),
-                                        _ => unreachable!(),
+                                        Some(Shape::Fill { .. }) => (),
+                                        _ => de_unreachable(s),
                                     }
                                 }
                                 "tr" => {
@@ -723,11 +1150,44 @@ impl DeJson for ShapeLayer {
                                         None => {
                                             _shape = Some(Shape::Transform(Default::default()));
                                         }
-                                        Some(Shape::Transform {..}) => (),
-                                        _ => unreachable!(),
+                                        Some(Shape::Transform { .. }) => (),
+                                        _ => de_unreachable(s),
                                     }
                                 }
-                                _ => unreachable!(),
+                                "sh" => {
+                                    println!("sub de_json for Path");
+                                    match _shape.as_ref() {
+                                        None => {
+                                            _shape = Some(Shape::Path {
+                                                data: Default::default(),
+                                                text_range: Default::default(),
+                                            });
+                                        }
+                                        Some(Shape::Path { .. }) => (),
+                                        _ => de_unreachable(s),
+                                    }
+                                }
+                                "st" => {
+                                    println!("sub de_json for Stroke");
+                                    match _shape.as_mut() {
+                                        None => {
+                                            let mut stroke = Stroke::default();
+                                            if let Some(dashes) = _dashes {
+                                                stroke.dashes = dashes;
+                                                _dashes = None;
+                                            }
+                                            _shape = Some(Shape::Stroke(stroke));
+                                        }
+                                        Some(Shape::Stroke(stroke)) => {
+                                            if let Some(dashes) = _dashes {
+                                                stroke.dashes = dashes;
+                                                _dashes = None;
+                                            }
+                                        }
+                                        _ => de_unreachable(s),
+                                    }
+                                }
+                                _ => de_unreachable(s),
                             }
                             s.next_tok(i)?;
                         }
@@ -738,14 +1198,14 @@ impl DeJson for ShapeLayer {
                         let shapes = DeJson::de_json(s, i)?;
                         match _shape.as_mut() {
                             None => {
-                                _shape = Some(Shape::Group {
-                                    shapes,
-                                });
+                                _shape = Some(Shape::Group { shapes });
                             }
-                            Some(Shape::Group {shapes: shapes_field}) => {
+                            Some(Shape::Group {
+                                shapes: shapes_field,
+                            }) => {
                                 *shapes_field = shapes;
-                            },
-                            _ => unreachable!(),
+                            }
+                            _ => de_unreachable(s),
                         }
                     }
                     "a" => {
@@ -757,37 +1217,119 @@ impl DeJson for ShapeLayer {
                         match _shape.as_mut() {
                             Some(Shape::Transform(transform)) => {
                                 transform.anchor = DeJson::de_json(s, i)?;
-                            },
-                            _ => unreachable!(),
+                            }
+                            _ => de_unreachable(s),
                         }
                     }
                     "c" => {
                         s.next_colon(i)?;
+                        println!("sub de_json for Twist");
                         println!("sub de_json for Fill");
+                        println!("sub de_json for Stroke");
                         let color = DeJson::de_json(s, i)?;
                         match _shape.as_mut() {
-                            None => {
-                                _shape = Some(Shape::Fill(Fill { color, ..Default::default()}));
-                            }
                             Some(Shape::Fill(fill)) => {
                                 fill.color = color;
-                            },
-                            _ => unreachable!(),
+                            }
+                            Some(Shape::Stroke(stroke)) => {
+                                if let Some(dashes) = _dashes {
+                                    stroke.dashes = dashes;
+                                    _dashes = None;
+                                }
+                                stroke.color = color;
+                            }
+                            _ => de_unreachable(s),
                         }
                     }
                     "d" => {
                         s.next_colon(i)?;
                         println!("sub de_json for Rectangle");
                         println!("sub de_json for Ellipse");
-                        let direction = DeJson::de_json(s, i)?;
+                        println!("sub de_json for Stroke");
+
+                        dbg!(&_shape);
                         match _shape.as_mut() {
+                            None => {
+                                dbg!(&s.tok);
+                                match s.tok {
+                                    DeJsonTok::U64(_) => {
+                                        _direction = DeJson::de_json(s, i)?;
+                                    }
+                                    DeJsonTok::BlockOpen => {
+                                        _dashes = DeJson::de_json(s, i)?;
+                                    }
+                                    _ => de_unreachable(s),
+                                }
+                            }
                             Some(Shape::Rectangle(rectangle)) => {
-                                rectangle.direction = direction;
-                            },
+                                rectangle.direction = DeJson::de_json(s, i)?;
+                            }
                             Some(Shape::Ellipse(ellipse)) => {
-                                ellipse.direction = direction;
-                            },
-                            _ => unreachable!(),
+                                ellipse.direction = DeJson::de_json(s, i)?;
+                            }
+                            Some(Shape::Stroke(stroke)) => {
+                                if let Some(dashes) = _dashes {
+                                    stroke.dashes = dashes;
+                                    _dashes = None;
+                                }
+                                stroke.dashes = DeJson::de_json(s, i)?;
+                            }
+                            _ => de_unreachable(s),
+                        }
+                    }
+                    "ks" => {
+                        s.next_colon(i)?;
+                        println!("sub de_json for Path");
+                        match _shape.as_mut() {
+                            Some(Shape::Path { ref mut data, .. }) => {
+                                *data = DeJson::de_json(s, i)?;
+                            }
+                            _ => de_unreachable(s),
+                        }
+                    }
+                    "lc" => {
+                        s.next_colon(i)?;
+                        println!("sub de_json for Stroke");
+                        dbg!(&_shape);
+                        match _shape.as_mut() {
+                            Some(Shape::Stroke(stroke)) => {
+                                if let Some(dashes) = _dashes {
+                                    stroke.dashes = dashes;
+                                    _dashes = None;
+                                }
+                                stroke.line_cap = DeJson::de_json(s, i)?;
+                            }
+                            _ => de_unreachable(s),
+                        }
+                    }
+                    "lj" => {
+                        s.next_colon(i)?;
+                        println!("sub de_json for Stroke");
+                        dbg!(&_shape);
+                        match _shape.as_mut() {
+                            Some(Shape::Stroke(stroke)) => {
+                                if let Some(dashes) = _dashes {
+                                    stroke.dashes = dashes;
+                                    _dashes = None;
+                                }
+                                stroke.line_join = DeJson::de_json(s, i)?;
+                            }
+                            _ => de_unreachable(s),
+                        }
+                    }
+                    "ml" => {
+                        s.next_colon(i)?;
+                        println!("sub de_json for Stroke");
+                        dbg!(&_shape);
+                        match _shape.as_mut() {
+                            Some(Shape::Stroke(stroke)) => {
+                                if let Some(dashes) = _dashes {
+                                    stroke.dashes = dashes;
+                                    _dashes = None;
+                                }
+                                stroke.miter_limit = DeJson::de_json(s, i)?;
+                            }
+                            _ => de_unreachable(s),
                         }
                     }
                     "o" => {
@@ -795,14 +1337,23 @@ impl DeJson for ShapeLayer {
                         println!("sub de_json for Repeater");
                         println!("sub de_json for Fill");
                         println!("sub de_json for Transform");
+                        println!("sub de_json for Stroke");
+                        dbg!(&_shape);
                         match _shape.as_mut() {
                             Some(Shape::Fill(fill)) => {
                                 fill.opacity = DeJson::de_json(s, i)?;
-                            },
+                            }
                             Some(Shape::Transform(transform)) => {
                                 transform.opacity = DeJson::de_json(s, i)?;
-                            },
-                            _ => unreachable!(),
+                            }
+                            Some(Shape::Stroke(stroke)) => {
+                                if let Some(dashes) = _dashes {
+                                    stroke.dashes = dashes;
+                                    _dashes = None;
+                                }
+                                stroke.opacity = DeJson::de_json(s, i)?;
+                            }
+                            _ => de_unreachable(s),
                         }
                     }
                     "p" => {
@@ -812,15 +1363,23 @@ impl DeJson for ShapeLayer {
                         println!("sub de_json for Ellipse");
                         match _shape.as_mut() {
                             Some(Shape::Rectangle(rectangle)) => {
+                                if let Some(direction) = _direction {
+                                    rectangle.direction = direction;
+                                    _direction = None;
+                                }
                                 rectangle.position = DeJson::de_json(s, i)?;
-                            },
+                            }
                             Some(Shape::Ellipse(ellipse)) => {
+                                if let Some(direction) = _direction {
+                                    ellipse.direction = direction;
+                                    _direction = None;
+                                }
                                 ellipse.position = DeJson::de_json(s, i)?;
-                            },
+                            }
                             Some(Shape::Transform(transform)) => {
                                 transform.position = DeJson::de_json(s, i)?;
-                            },
-                            _ => unreachable!(),
+                            }
+                            _ => de_unreachable(s),
                         }
                     }
                     "r" => {
@@ -833,17 +1392,21 @@ impl DeJson for ShapeLayer {
                         match _shape.as_mut() {
                             Some(Shape::Fill(fill)) => {
                                 fill.fill_rule = DeJson::de_json(s, i)?;
-                            },
+                            }
                             Some(Shape::Transform(transform)) => {
                                 transform.rotation = DeJson::de_json(s, i)?;
-                            },
+                            }
                             Some(Shape::Rectangle(rectangle)) => {
+                                if let Some(direction) = _direction {
+                                    rectangle.direction = direction;
+                                    _direction = None;
+                                }
                                 rectangle.radius = DeJson::de_json(s, i)?;
-                            },
-                            Some(Shape::RoundedCorners{radius}) => {
+                            }
+                            Some(Shape::RoundedCorners { radius }) => {
                                 *radius = DeJson::de_json(s, i)?;
-                            },
-                            _ => unreachable!(),
+                            }
+                            _ => de_unreachable(s),
                         }
                     }
                     "s" => {
@@ -854,15 +1417,23 @@ impl DeJson for ShapeLayer {
                         println!("sub de_json for Transform");
                         match _shape.as_mut() {
                             Some(Shape::Rectangle(rectangle)) => {
+                                if let Some(direction) = _direction {
+                                    rectangle.direction = direction;
+                                    _direction = None;
+                                }
                                 rectangle.size = DeJson::de_json(s, i)?;
-                            },
+                            }
                             Some(Shape::Ellipse(ellipse)) => {
+                                if let Some(direction) = _direction {
+                                    ellipse.direction = direction;
+                                    _direction = None;
+                                }
                                 ellipse.size = DeJson::de_json(s, i)?;
-                            },
+                            }
                             Some(Shape::Transform(transform)) => {
                                 transform.scale = DeJson::de_json(s, i)?;
-                            },
-                            _ => unreachable!(),
+                            }
+                            _ => de_unreachable(s),
                         }
                     }
                     "sk" => {
@@ -871,8 +1442,8 @@ impl DeJson for ShapeLayer {
                         match _shape.as_mut() {
                             Some(Shape::Transform(transform)) => {
                                 transform.skew = DeJson::de_json(s, i)?;
-                            },
-                            _ => unreachable!(),
+                            }
+                            _ => de_unreachable(s),
                         }
                     }
                     "sa" => {
@@ -881,8 +1452,23 @@ impl DeJson for ShapeLayer {
                         match _shape.as_mut() {
                             Some(Shape::Transform(transform)) => {
                                 transform.skew_axis = DeJson::de_json(s, i)?;
-                            },
-                            _ => unreachable!(),
+                            }
+                            _ => de_unreachable(s),
+                        }
+                    }
+                    "w" => {
+                        s.next_colon(i)?;
+                        println!("sub de_json for Stroke");
+                        dbg!(&_shape);
+                        match _shape.as_mut() {
+                            Some(Shape::Stroke(stroke)) => {
+                                if let Some(dashes) = _dashes {
+                                    stroke.dashes = dashes;
+                                    _dashes = None;
+                                }
+                                stroke.width = DeJson::de_json(s, i)?;
+                            }
+                            _ => de_unreachable(s),
                         }
                     }
                     _ => {
@@ -929,17 +1515,17 @@ pub enum Shape {
     Ellipse(Ellipse),
     // #[nserde(rename = "sr")]
     // PolyStar(PolyStar),
-    // #[nserde(rename = "sh")]
-    // Path {
-    //     #[nserde(rename = "ks")]
-    //     d: Animated<Vec<Bezier>>,
-    //     #[nserde(skip)]
-    //     text_range: Option<TextRangeInfo>,
-    // },
+    #[nserde(rename = "sh")]
+    Path {
+        #[nserde(rename = "ks")]
+        data: Animated<Vec<Bezier>>,
+        #[nserde(skip)]
+        text_range: Option<TextRangeInfo>,
+    },
     #[nserde(rename = "fl")]
     Fill(Fill),
-    // #[nserde(rename = "st")]
-    // Stroke(Stroke),
+    #[nserde(rename = "st")]
+    Stroke(Stroke),
     // #[nserde(rename = "gf")]
     // GradientFill(GradientFill),
     // #[nserde(rename = "gs")]
@@ -1018,6 +1604,210 @@ impl Default for Shape {
 }
 
 #[derive(SerJson, DeJson, Debug, Clone, Default)]
+pub struct Bezier {
+    #[nserde(rename = "c", default)]
+    pub closed: bool,
+    #[nserde(
+        rename = "v",
+        deserialize_with = "vec_from_array",
+        serialize_with = "array_from_vec"
+    )]
+    pub verticies: Vec<Vector2D>,
+    #[nserde(
+        rename = "i",
+        deserialize_with = "vec_from_array",
+        serialize_with = "array_from_vec"
+    )]
+    pub in_tangent: Vec<Vector2D>,
+    #[nserde(
+        rename = "o",
+        deserialize_with = "vec_from_array",
+        serialize_with = "array_from_vec"
+    )]
+    pub out_tangent: Vec<Vector2D>,
+}
+
+impl FromTo<Value> for Vec<Bezier> {
+    fn from(v: Value) -> Self {
+        match v {
+            Value::ComplexBezier(b) => b,
+            Value::Bezier(b) => vec![b],
+            _ => todo!(),
+        }
+    }
+
+    fn to(self) -> Value {
+        Value::ComplexBezier(self)
+    }
+}
+
+#[derive(DeJson, SerJson, Debug, Clone)]
+pub struct TextRangeInfo {
+    #[nserde(skip)]
+    pub value: Vec<Vec<char>>,
+    pub index: (usize, usize), // line, char
+    pub ranges: Vec<TextRange>,
+}
+
+#[derive(DeJson, SerJson, Debug, Clone)]
+pub struct TextRange {
+    #[nserde(rename = "nm", default)]
+    name: Option<String>,
+    #[nserde(rename = "a", default)]
+    pub style: Option<TextStyle>,
+    #[nserde(rename = "s")]
+    pub selector: TextRangeSelector,
+}
+
+#[derive(DeJson, SerJson, Debug, Clone)]
+pub struct TextRangeSelector {
+    #[nserde(rename = "t", proxy = "BoolFromInt")]
+    expressible: bool,
+    #[nserde(rename = "xe")]
+    max_ease: Animated<f32>,
+    #[nserde(rename = "ne")]
+    min_ease: Animated<f32>,
+    #[nserde(rename = "a")]
+    max_amount: Animated<f32>,
+    #[nserde(rename = "b")]
+    based_on: TextBased,
+    #[nserde(rename = "rn", proxy = "BoolFromInt")]
+    randomize: bool,
+    #[nserde(rename = "sh")]
+    shape: TextShape,
+    #[nserde(rename = "o", default)]
+    offset: Option<Animated<f32>>,
+    #[nserde(rename = "r")]
+    pub range_units: TextBased,
+    #[nserde(rename = "sm", default)]
+    selector_smoothness: Option<Animated<f32>>,
+    #[nserde(rename = "s", default)]
+    pub start: Option<Animated<f32>>,
+    #[nserde(rename = "e", default)]
+    pub end: Option<Animated<f32>>,
+}
+
+#[derive(Debug, Clone, Copy)]
+#[repr(u8)]
+pub enum TextBased {
+    Characters = 1,
+    CharactersExcludingSpaces = 2,
+    Words = 3,
+    Lines = 4,
+}
+
+impl DeJson for TextBased {
+    fn de_json(s: &mut DeJsonState, i: &mut std::str::Chars) -> Result<Self, DeJsonErr> {
+        println!("de_json for TextBased");
+
+        match s.tok {
+            DeJsonTok::U64(_) => {
+                let r = s.as_f64()? as u8;
+                s.next_tok(i)?;
+                match r {
+                    1 => Ok(Self::Characters),
+                    2 => Ok(Self::CharactersExcludingSpaces),
+                    3 => Ok(Self::Words),
+                    4 => Ok(Self::Lines),
+                    _ => Err(s.err_range("1..4")),
+                }
+            }
+            _ => Err(s.err_token("F64")),
+        }
+    }
+}
+
+impl SerJson for TextBased {
+    fn ser_json(&self, d: usize, s: &mut SerJsonState) {
+        match self {
+            Self::Characters => 1.ser_json(d, s),
+            Self::CharactersExcludingSpaces => 2.ser_json(d, s),
+            Self::Words => 3.ser_json(d, s),
+            Self::Lines => 4.ser_json(d, s),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+#[repr(u8)]
+pub enum TextShape {
+    Square = 1,
+    RampUp = 2,
+    RampDown = 3,
+    Triangle = 4,
+    Round = 5,
+    Smooth = 6,
+}
+
+impl DeJson for TextShape {
+    fn de_json(s: &mut DeJsonState, i: &mut std::str::Chars) -> Result<Self, DeJsonErr> {
+        println!("de_json for TextShape");
+
+        match s.tok {
+            DeJsonTok::U64(_) => {
+                let r = s.as_f64()? as u8;
+                s.next_tok(i)?;
+                match r {
+                    1 => Ok(Self::Square),
+                    2 => Ok(Self::RampUp),
+                    3 => Ok(Self::RampDown),
+                    4 => Ok(Self::Triangle),
+                    5 => Ok(Self::Round),
+                    6 => Ok(Self::Smooth),
+                    _ => Err(s.err_range("1..6")),
+                }
+            }
+            _ => Err(s.err_token("F64")),
+        }
+    }
+}
+
+impl SerJson for TextShape {
+    fn ser_json(&self, d: usize, s: &mut SerJsonState) {
+        match self {
+            Self::Square => 1.ser_json(d, s),
+            Self::RampUp => 2.ser_json(d, s),
+            Self::RampDown => 3.ser_json(d, s),
+            Self::Triangle => 4.ser_json(d, s),
+            Self::Round => 5.ser_json(d, s),
+            Self::Smooth => 6.ser_json(d, s),
+        }
+    }
+}
+
+#[derive(DeJson, SerJson, Debug, Clone)]
+pub struct TextStyle {
+    #[nserde(rename = "sw", default)]
+    stroke_width: Option<Animated<f32>>,
+    #[nserde(rename = "sc", default)]
+    stroke_color: Option<Animated<Rgb>>,
+    #[nserde(rename = "sh", default)]
+    stroke_hue: Option<Animated<f32>>,
+    #[nserde(rename = "ss", default)]
+    stroke_saturation: Option<Animated<f32>>,
+    #[nserde(rename = "sb", default)]
+    stroke_brightness: Option<Animated<f32>>,
+    #[nserde(rename = "so", default)]
+    stroke_opacity: Option<Animated<f32>>,
+    #[nserde(rename = "fc", default)]
+    fill_color: Option<Animated<Rgb>>,
+    #[nserde(rename = "fh", default)]
+    fill_hue: Option<Animated<f32>>,
+    #[nserde(rename = "fs", default)]
+    fill_saturation: Option<Animated<f32>>,
+    #[nserde(rename = "fb", default)]
+    fill_brightness: Option<Animated<f32>>,
+    #[nserde(rename = "t", default)]
+    pub letter_spacing: Option<Animated<f32>>,
+    #[nserde(rename = "bl", default)]
+    blur: Option<Animated<f32>>,
+    #[nserde(rename = "ls", default)]
+    pub line_spacing: Option<Animated<f32>>,
+    // #[nserde(flatten)]
+    transform: Option<Transform>,
+}
+
+#[derive(SerJson, DeJson, Debug, Clone, Default)]
 pub struct Rectangle {
     #[nserde(rename = "d", default)]
     pub direction: ShapeDirection,
@@ -1039,7 +1829,7 @@ pub struct Ellipse {
     pub size: Animated<Vector2D>,
 }
 
-#[derive(DeJson, Debug, Clone, Copy, PartialEq, Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Default)]
 #[repr(u8)]
 pub enum ShapeDirection {
     #[default]
@@ -1047,8 +1837,27 @@ pub enum ShapeDirection {
     CounterClockwise = 2,
 }
 
+impl DeJson for ShapeDirection {
+    fn de_json(s: &mut DeJsonState, i: &mut std::str::Chars) -> Result<Self, DeJsonErr> {
+        println!("de_json for FillRule");
+
+        match s.tok {
+            DeJsonTok::U64(_) => {
+                let r = s.as_f64()? as u8;
+                s.next_tok(i)?;
+                match r {
+                    1 => Ok(Self::Clockwise),
+                    2 => Ok(Self::CounterClockwise),
+                    _ => Err(s.err_range("1..2")),
+                }
+            }
+            _ => Err(s.err_token("F64")),
+        }
+    }
+}
+
 impl SerJson for ShapeDirection {
-    fn ser_json(&self, d: usize, s: &mut nanoserde::SerJsonState) {
+    fn ser_json(&self, d: usize, s: &mut SerJsonState) {
         match self {
             Self::Clockwise => 1.ser_json(d, s),
             Self::CounterClockwise => 2.ser_json(d, s),
@@ -1087,8 +1896,9 @@ impl Rgb {
     }
 }
 
-impl FromTo<Vec<f32>> for Rgb {
-    fn from(v: Vec<f32>) -> Self {
+impl FromTo<Value> for Rgb {
+    fn from(v: Value) -> Self {
+        let v = v.as_f32_vec().unwrap();
         if v[0] > 1.0 && v[0] <= 255.0 {
             Rgb::new_u8(v[0] as u8, v[1] as u8, v[2] as u8)
         } else {
@@ -1096,12 +1906,12 @@ impl FromTo<Vec<f32>> for Rgb {
         }
     }
 
-    fn to(self) -> Vec<f32> {
-        vec![
+    fn to(self) -> Value {
+        Value::List(vec![
             self.r as f32 / 255.0,
             self.g as f32 / 255.0,
             self.b as f32 / 255.0,
-        ]
+        ])
     }
 }
 
@@ -1114,17 +1924,17 @@ pub enum FillRule {
 }
 
 impl DeJson for FillRule {
-    fn de_json(s: &mut nanoserde::DeJsonState, i: &mut std::str::Chars) -> Result<Self, nanoserde::DeJsonErr> {
+    fn de_json(s: &mut DeJsonState, i: &mut std::str::Chars) -> Result<Self, DeJsonErr> {
         println!("de_json for FillRule");
 
         match s.tok {
-            nanoserde::DeJsonTok::U64(_) => {
+            DeJsonTok::U64(_) => {
                 let r = s.as_f64()? as u8;
                 s.next_tok(i)?;
                 match r {
                     1 => Ok(Self::NonZero),
                     2 => Ok(Self::EvenOdd),
-                    _ => Err(s.err_range("1..2"))
+                    _ => Err(s.err_range("1..2")),
                 }
             }
             _ => Err(s.err_token("F64")),
@@ -1133,7 +1943,7 @@ impl DeJson for FillRule {
 }
 
 impl SerJson for FillRule {
-    fn ser_json(&self, d: usize, s: &mut nanoserde::SerJsonState) {
+    fn ser_json(&self, d: usize, s: &mut SerJsonState) {
         match self {
             Self::NonZero => 1.ser_json(d, s),
             Self::EvenOdd => 2.ser_json(d, s),
@@ -1141,6 +1951,119 @@ impl SerJson for FillRule {
     }
 }
 
+#[derive(SerJson, DeJson, Debug, Clone, Default)]
+pub struct Stroke {
+    #[nserde(rename = "lc")]
+    pub line_cap: LineCap,
+    #[nserde(rename = "lj")]
+    pub line_join: LineJoin,
+    #[nserde(rename = "ml", default)]
+    miter_limit: f32,
+    #[nserde(rename = "o")]
+    pub opacity: Animated<f32>,
+    #[nserde(rename = "w")]
+    pub width: Animated<f32>,
+    #[nserde(rename = "d", default)]
+    dashes: Vec<StrokeDash>,
+    #[nserde(rename = "c")]
+    pub color: Animated<Rgb>,
+}
+
+#[derive(Debug, Clone, Copy, Default)]
+#[repr(u8)]
+pub enum LineCap {
+    #[default]
+    Butt = 1,
+    Round = 2,
+    Square = 3,
+}
+
+impl DeJson for LineCap {
+    fn de_json(s: &mut DeJsonState, i: &mut std::str::Chars) -> Result<Self, DeJsonErr> {
+        println!("de_json for TextJustify");
+
+        match s.tok {
+            DeJsonTok::U64(_) => {
+                let r = s.as_f64()? as u8;
+                s.next_tok(i)?;
+                match r {
+                    1 => Ok(Self::Butt),
+                    2 => Ok(Self::Round),
+                    3 => Ok(Self::Square),
+                    _ => Err(s.err_range("0..6")),
+                }
+            }
+            _ => Err(s.err_token("F64")),
+        }
+    }
+}
+
+impl SerJson for LineCap {
+    fn ser_json(&self, d: usize, s: &mut SerJsonState) {
+        match self {
+            Self::Butt => 1.ser_json(d, s),
+            Self::Round => 2.ser_json(d, s),
+            Self::Square => 3.ser_json(d, s),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, Default)]
+#[repr(u8)]
+pub enum LineJoin {
+    #[default]
+    Miter = 1,
+    Round = 2,
+    Bevel = 3,
+}
+
+impl DeJson for LineJoin {
+    fn de_json(s: &mut DeJsonState, i: &mut std::str::Chars) -> Result<Self, DeJsonErr> {
+        println!("de_json for TextJustify");
+
+        match s.tok {
+            DeJsonTok::U64(_) => {
+                let r = s.as_f64()? as u8;
+                s.next_tok(i)?;
+                match r {
+                    1 => Ok(Self::Miter),
+                    2 => Ok(Self::Round),
+                    3 => Ok(Self::Bevel),
+                    _ => Err(s.err_range("0..6")),
+                }
+            }
+            _ => Err(s.err_token("F64")),
+        }
+    }
+}
+
+impl SerJson for LineJoin {
+    fn ser_json(&self, d: usize, s: &mut SerJsonState) {
+        match self {
+            Self::Miter => 1.ser_json(d, s),
+            Self::Round => 2.ser_json(d, s),
+            Self::Bevel => 3.ser_json(d, s),
+        }
+    }
+}
+
+#[derive(SerJson, DeJson, Debug, Clone)]
+pub struct StrokeDash {
+    #[nserde(rename = "v")]
+    length: Animated<f32>,
+    #[nserde(rename = "n")]
+    ty: StrokeDashType,
+}
+
+#[derive(SerJson, DeJson, Debug, Clone, Copy)]
+pub enum StrokeDashType {
+    #[nserde(rename = "d")]
+    Dash,
+    #[nserde(rename = "g")]
+    Gap,
+    #[nserde(rename = "o")]
+    Offset,
+}
 
 // #[derive(SerJson, DeJson, Debug, Clone)]
 // pub struct TextAnimationData {
@@ -1152,16 +2075,6 @@ impl SerJson for FillRule {
 //     options: TextAlignmentOptions,
 //     #[nserde(rename = "p")]
 //     follow_path: TextFollowPath,
-// }
-
-// #[derive(SerJson, DeJson, Debug, Clone)]
-// pub struct TextRange {
-//     #[nserde(rename = "nm", default)]
-//     name: Option<String>,
-//     #[nserde(rename = "a", default)]
-//     pub style: Option<TextStyle>,
-//     #[nserde(rename = "s")]
-//     pub selector: TextRangeSelector,
 // }
 
 #[derive(SerJson, DeJson, Debug, Clone)]
@@ -1196,6 +2109,7 @@ pub fn default_number_100() -> Animated<f32> {
 }
 
 #[derive(SerJson, DeJson, Debug, Clone)]
+#[nserde(serialize_none_as_null)]
 pub struct Transform {
     #[nserde(rename = "a", default)]
     pub anchor: Option<Animated<Vector2D>>,
@@ -1231,12 +2145,12 @@ impl Default for Transform {
     }
 }
 
-#[derive(PartialEq, Debug)]
+#[derive(Debug)]
 // deserialize_with = "keyframes_from_array"
 pub enum KeyFramesFromArray {
-    Plain(f32),
-    List(Vec<f32>),
-    LegacyKeyFrames(Vec<LegacyKeyFrame<Vec<f32>>>),
+    Plain(Value),
+    List(Value),
+    LegacyKeyFrames(Vec<LegacyKeyFrame<Value>>),
 }
 
 fn default_none<T>() -> Option<T> {
@@ -1262,22 +2176,23 @@ pub struct LegacyKeyFrame<T> {
 }
 
 impl DeJson for KeyFramesFromArray {
-    fn de_json(
-        s: &mut nanoserde::DeJsonState,
-        i: &mut core::str::Chars,
-    ) -> Result<Self, nanoserde::DeJsonErr> {
+    fn de_json(s: &mut DeJsonState, i: &mut core::str::Chars) -> Result<Self, DeJsonErr> {
         println!("de_json for KeyFramesFromArray");
         dbg!(&s.tok);
         match s.tok {
-            nanoserde::DeJsonTok::U64(v) => {
+            DeJsonTok::U64(v) => {
                 s.next_tok(i)?;
-                Ok(Self::Plain(v as f32))
+                Ok(Self::Plain(Value::Primitive(v as f32)))
             }
-            nanoserde::DeJsonTok::BlockOpen => {
+            DeJsonTok::I64(v) => {
+                s.next_tok(i)?;
+                Ok(Self::Plain(Value::Primitive(v as f32)))
+            }
+            DeJsonTok::BlockOpen => {
                 s.next_tok(i)?;
                 dbg!(&s.tok);
                 match s.tok {
-                    nanoserde::DeJsonTok::F64(v) => {
+                    DeJsonTok::F64(v) => {
                         let mut res = vec![v as f32];
                         s.next_tok(i)?;
                         s.eat_comma_block(i)?;
@@ -1288,9 +2203,9 @@ impl DeJson for KeyFramesFromArray {
                         }
                         s.block_close(i)?;
                         dbg!(&res);
-                        Ok(Self::List(res))
+                        Ok(Self::List(Value::List(res)))
                     }
-                    nanoserde::DeJsonTok::U64(v) => {
+                    DeJsonTok::U64(v) => {
                         let mut res = vec![v as f32];
                         s.next_tok(i)?;
                         s.eat_comma_block(i)?;
@@ -1301,9 +2216,22 @@ impl DeJson for KeyFramesFromArray {
                         }
                         s.block_close(i)?;
                         dbg!(&res);
-                        Ok(Self::List(res))
+                        Ok(Self::List(Value::List(res)))
                     }
-                    nanoserde::DeJsonTok::CurlyOpen => {
+                    DeJsonTok::I64(v) => {
+                        let mut res = vec![v as f32];
+                        s.next_tok(i)?;
+                        s.eat_comma_block(i)?;
+
+                        while s.tok != DeJsonTok::BlockClose {
+                            res.push(DeJson::de_json(s, i)?);
+                            s.eat_comma_block(i)?;
+                        }
+                        s.block_close(i)?;
+                        dbg!(&res);
+                        Ok(Self::List(Value::List(res)))
+                    }
+                    DeJsonTok::CurlyOpen => {
                         let mut res = vec![];
                         s.next_tok(i)?;
                         {
@@ -1353,18 +2281,38 @@ impl DeJson for KeyFramesFromArray {
                                     if let Some(t) = _start_value {
                                         t
                                     } else {
-                                        return Err(s.err_nf("start_value"))
+                                        return Err(s.err_nf("start_value"));
                                     }
                                 },
                                 end_value: {
-                                    if let Some(t) = _end_value { t } else { default_none() }
+                                    if let Some(t) = _end_value {
+                                        t
+                                    } else {
+                                        default_none()
+                                    }
                                 },
                                 start_frame: {
-                                    if let Some(t) = _start_frame { t } else { Default::default() }
+                                    if let Some(t) = _start_frame {
+                                        t
+                                    } else {
+                                        Default::default()
+                                    }
                                 },
                                 end_frame: Default::default(),
-                                easing_out: { if let Some(t) = _easing_out { t } else { None } },
-                                easing_in: { if let Some(t) = _easing_in { t } else { None } },
+                                easing_out: {
+                                    if let Some(t) = _easing_out {
+                                        t
+                                    } else {
+                                        None
+                                    }
+                                },
+                                easing_in: {
+                                    if let Some(t) = _easing_in {
+                                        t
+                                    } else {
+                                        None
+                                    }
+                                },
                                 hold: {
                                     if let Some(t) = _hold {
                                         From::<&BoolFromInt>::from(&t)
@@ -1387,13 +2335,17 @@ impl DeJson for KeyFramesFromArray {
                     _ => Err(s.err_token("U64 or {")),
                 }
             }
+            DeJsonTok::CurlyOpen => {
+                let res = DeJson::de_json(s, i)?;
+                Ok(Self::Plain(Value::Bezier(res)))
+            }
             _ => Err(s.err_token("U64 or [")),
         }
     }
 }
 
 impl SerJson for KeyFramesFromArray {
-    fn ser_json(&self, d: usize, s: &mut nanoserde::SerJsonState) {
+    fn ser_json(&self, d: usize, s: &mut SerJsonState) {
         match self {
             Self::Plain(f0) => {
                 f0.ser_json(d, s);
@@ -1401,25 +2353,25 @@ impl SerJson for KeyFramesFromArray {
             Self::List(f0) => {
                 f0.ser_json(d, s);
             }
-            Self::LegacyKeyFrames(_) => todo!()
+            Self::LegacyKeyFrames(_) => todo!(),
         }
     }
 }
 
 impl<T: Default + Debug> From<&Vec<KeyFrame<T>>> for KeyFramesFromArray {
     fn from(value: &Vec<KeyFrame<T>>) -> KeyFramesFromArray {
-        KeyFramesFromArray::List(value.iter().map(|v| v.start_frame).collect())
+        KeyFramesFromArray::List(Value::List(value.iter().map(|v| v.start_frame).collect()))
     }
 }
 
-impl<T: Clone + Default + FromTo<Vec<f32>> + Debug> From<&KeyFramesFromArray> for Vec<KeyFrame<T>> {
+impl<T: Clone + Default + FromTo<Value> + Debug> From<&KeyFramesFromArray> for Vec<KeyFrame<T>> {
     fn from(val: &KeyFramesFromArray) -> Vec<KeyFrame<T>> {
         dbg!(val);
         match val {
             KeyFramesFromArray::Plain(v) => {
                 vec![KeyFrame {
-                    start_value: T::from(vec![*v]),
-                    end_value: T::from(vec![*v]),
+                    start_value: T::from(v.clone()),
+                    end_value: T::from(v.clone()),
                     start_frame: 0.0,
                     end_frame: 0.0,
                     easing_in: None,
@@ -1437,7 +2389,7 @@ impl<T: Clone + Default + FromTo<Vec<f32>> + Debug> From<&KeyFramesFromArray> fo
                 }]
             }
             KeyFramesFromArray::LegacyKeyFrames(v) => {
-                let mut result: Vec<LegacyKeyFrame<Vec<f32>>> = vec![];
+                let mut result: Vec<LegacyKeyFrame<Value>> = vec![];
                 // Sometimes keyframes especially from TextData do not have an ending frame, so
                 // we double check here to avoid removing them.
                 for k in v {
@@ -1484,7 +2436,7 @@ impl<T: Clone + Default + FromTo<Vec<f32>> + Debug> From<&KeyFramesFromArray> fo
 }
 
 #[derive(SerJson, DeJson, Debug, Clone, Default)]
-pub struct Animated<T: Debug + Default + Clone + FromTo<Vec<f32>>> {
+pub struct Animated<T: Debug + Default + Clone + FromTo<Value>> {
     #[nserde(proxy = "BoolFromInt", rename = "a", default)]
     pub animated: bool,
     #[nserde(proxy = "KeyFramesFromArray", rename = "k")]
@@ -1529,20 +2481,22 @@ enum ArrayFromArrayOfNumber {
 }
 
 impl DeJson for ArrayFromArrayOfNumber {
-    fn de_json(
-        s: &mut nanoserde::DeJsonState,
-        i: &mut core::str::Chars,
-    ) -> Result<Self, nanoserde::DeJsonErr> {
+    fn de_json(s: &mut DeJsonState, i: &mut core::str::Chars) -> Result<Self, DeJsonErr> {
         println!("de_json for ArrayFromArrayOfNumber");
         dbg!((s.cur, s.line, s.col));
         dbg!(&s.tok);
         match s.tok {
-            nanoserde::DeJsonTok::F64(_) => {
+            DeJsonTok::U64(_) => {
                 let r = Self::Primitive(s.as_f64()? as f32);
                 s.next_tok(i)?;
                 Ok(r)
             }
-            nanoserde::DeJsonTok::BlockOpen => {
+            DeJsonTok::F64(_) => {
+                let r = Self::Primitive(s.as_f64()? as f32);
+                s.next_tok(i)?;
+                Ok(r)
+            }
+            DeJsonTok::BlockOpen => {
                 let r: Vec<f32> = DeJson::de_json(s, i)?;
                 Ok(Self::List(r))
             }
