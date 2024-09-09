@@ -7,8 +7,8 @@ use {
 };
 
 fn main() {
-    // let path = "assets/glaxnimate_triangle.json";
-    let path = "assets/glaxnimate_rectangles.json";
+    let path = "assets/glaxnimate_triangle.json";
+    // let path = "assets/glaxnimate_rectangles.json";
     // let path = "pylottie_circle.json";
     // let path = "../lottie-rs/fixtures/ui/bouncy_ball.json";
     // let path = "../lottie-rs/fixtures/ui/7148-the-nyan-cat.json";

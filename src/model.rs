@@ -38,8 +38,6 @@ impl Value {
 
 impl DeJson for Value {
     fn de_json(s: &mut DeJsonState, i: &mut Chars) -> Result<Self, DeJsonErr> {
-        println!("de_json for Value");
-        dbg!(&s.tok);
         match s.tok {
             DeJsonTok::U64(v) => {
                 s.next_tok(i)?;
@@ -47,7 +45,6 @@ impl DeJson for Value {
             }
             DeJsonTok::BlockOpen => {
                 s.next_tok(i)?;
-                dbg!(&s.tok);
                 match s.tok {
                     DeJsonTok::F64(v) => {
                         let mut res = vec![v as f32];
@@ -59,7 +56,6 @@ impl DeJson for Value {
                             s.eat_comma_block(i)?;
                         }
                         s.block_close(i)?;
-                        dbg!(&res);
                         Ok(Self::List(res))
                     }
                     DeJsonTok::U64(v) => {
@@ -72,7 +68,6 @@ impl DeJson for Value {
                             s.eat_comma_block(i)?;
                         }
                         s.block_close(i)?;
-                        dbg!(&res);
                         Ok(Self::List(res))
                     }
                     DeJsonTok::CurlyOpen => {
@@ -83,7 +78,6 @@ impl DeJson for Value {
                             s.eat_comma_block(i)?;
                         }
                         s.block_close(i)?;
-                        dbg!(&res);
                         Ok(Self::ComplexBezier(res))
                     }
                     _ => Err(s.err_token("U64 or {")),
@@ -189,7 +183,6 @@ impl Default for TextJustify {
 
 impl DeJson for TextJustify {
     fn de_json(s: &mut DeJsonState, i: &mut std::str::Chars) -> Result<Self, DeJsonErr> {
-        println!("de_json for TextJustify");
 
         match s.tok {
             DeJsonTok::U64(_) => {
@@ -241,7 +234,6 @@ impl Default for TextCaps {
 
 impl DeJson for TextCaps {
     fn de_json(s: &mut DeJsonState, i: &mut std::str::Chars) -> Result<Self, DeJsonErr> {
-        println!("de_json for TextCaps");
 
         match s.tok {
             DeJsonTok::U64(_) => {
@@ -303,7 +295,6 @@ mod vector_2_d {
     impl DeJson for Vector2D<f32> {
         #[allow(clippy::ignored_unit_patterns)]
         fn de_json(s: &mut DeJsonState, i: &mut Chars) -> Result<Self, DeJsonErr> {
-            println!("de_json for Vector2D");
             s.block_open(i)?;
             let x: f32 = {
                 let r = DeJson::de_json(s, i)?;
@@ -388,8 +379,6 @@ pub enum Asset {
 
 impl DeJson for Asset {
     fn de_json(s: &mut DeJsonState, i: &mut Chars) -> Result<Self, DeJsonErr> {
-        println!("de_json for Asset");
-        dbg!(&s.tok);
         match s.tok {
             DeJsonTok::CurlyOpen => {
                 let mut _asset = None;
@@ -399,7 +388,6 @@ impl DeJson for Asset {
                 s.next_tok(i)?;
                 {
                     while let Some(_) = s.next_str() {
-                        dbg!(&s.strbuf);
                         match AsRef::<str>::as_ref(&s.strbuf) {
                             "e" => {
                                 s.next_colon(i)?;
@@ -425,7 +413,6 @@ impl DeJson for Asset {
                             }
                             "fr" => {
                                 s.next_colon(i)?;
-                                dbg!(&_asset);
                                 match _asset.as_mut() {
                                     None => {
                                         let mut precomposition = Precomposition::default();
@@ -608,7 +595,6 @@ impl DeJson for Asset {
                             }
                             "w" => {
                                 s.next_colon(i)?;
-                                dbg!(&_asset);
                                 match _asset.as_mut() {
                                     Some(Asset::Media(media)) => {
                                         if let Some(name) = _name {
@@ -725,7 +711,6 @@ pub enum FontPathOrigin {
 
 impl DeJson for FontPathOrigin {
     fn de_json(s: &mut DeJsonState, i: &mut std::str::Chars) -> Result<Self, DeJsonErr> {
-        println!("de_json for FontPathOrigin");
 
         match s.tok {
             DeJsonTok::U64(_) => {
@@ -809,7 +794,6 @@ pub enum MatteMode {
 
 impl DeJson for MatteMode {
     fn de_json(s: &mut DeJsonState, i: &mut std::str::Chars) -> Result<Self, DeJsonErr> {
-        println!("de_json for MatteMode");
 
         match s.tok {
             DeJsonTok::U64(_) => {
@@ -866,7 +850,6 @@ pub enum BlendMode {
 
 impl DeJson for BlendMode {
     fn de_json(s: &mut DeJsonState, i: &mut std::str::Chars) -> Result<Self, DeJsonErr> {
-        println!("de_json for BlendMode");
 
         match s.tok {
             DeJsonTok::U64(_) => {
@@ -960,7 +943,6 @@ pub enum MaskMode {
 impl DeJson for Layer {
     #[allow(clippy::ignored_unit_patterns)]
     fn de_json(s: &mut DeJsonState, i: &mut Chars) -> Result<Self, DeJsonErr> {
-        println!("de_json for Layer\n");
         Ok({
             let mut _is_3d = None;
             let mut _hidden = None;
@@ -982,7 +964,6 @@ impl DeJson for Layer {
 
             s.curly_open(i)?;
             while let Some(_) = s.next_str() {
-                dbg!(&s.strbuf);
                 match AsRef::<str>::as_ref(&s.strbuf) {
                     "a" => {
                         s.next_colon(i)?;
@@ -990,7 +971,6 @@ impl DeJson for Layer {
                         //     _content,
                         //     None | Some(LayerContent::Text(_))
                         // ));
-                        println!("sub de_json for Text(TextAnimationData)");
                         // _content = Some(DeJson::de_json(s, i)?);
                     }
                     "ao" => {
@@ -1007,7 +987,6 @@ impl DeJson for Layer {
                         //     _content,
                         //     None | Some(LayerContent::Text(_))
                         // ));
-                        println!("sub de_json for Text(TextAnimationData)");
                         // _content = Some(DeJson::de_json(s, i)?);
                     }
                     "ddd" => {
@@ -1017,13 +996,10 @@ impl DeJson for Layer {
                     "e" => {
                         s.next_colon(i)?;
                         assert!(matches!(_content, None | Some(LayerContent::Media(_))));
-                        println!("sub de_json for Media");
                         // _content = Some(DeJson::de_json(s, i)?);
                     }
                     "h" => {
                         s.next_colon(i)?;
-                        println!("sub de_json for PreCompositionRef");
-                        println!("sub de_json for Media");
                         match _content.as_mut() {
                             Some(LayerContent::PreCompositionRef(PreCompositionRef {
                                 ref mut height,
@@ -1060,7 +1036,6 @@ impl DeJson for Layer {
                         //     _content,
                         //     None | Some(LayerContent::Text(_))
                         // ));
-                        println!("sub de_json for Text(TextAnimationData)");
                         // _content = Some(DeJson::de_json(s, i)?);
                     }
                     "masksProperties" => {
@@ -1081,8 +1056,6 @@ impl DeJson for Layer {
                     }
                     "p" => {
                         s.next_colon(i)?;
-                        println!("sub de_json for Text(TextAnimationData)");
-                        println!("sub de_json for Media");
                         // _content = Some(DeJson::de_json(s, i)?);
                     }
                     "parent" => {
@@ -1091,8 +1064,6 @@ impl DeJson for Layer {
                     }
                     "refId" => {
                         s.next_colon(i)?;
-                        println!("sub de_json for PreCompositionRef");
-                        println!("sub de_json for MediaRef");
                         match _content.as_mut() {
                             Some(LayerContent::PreCompositionRef(PreCompositionRef {
                                 ref mut ref_id,
@@ -1109,7 +1080,6 @@ impl DeJson for Layer {
                             _content,
                             None | Some(LayerContent::SolidColor { .. })
                         ));
-                        println!("sub de_json for SolidColor");
                         // _content = Some(DeJson::de_json(s, i)?);
                     }
                     "sh" => {
@@ -1118,13 +1088,10 @@ impl DeJson for Layer {
                             _content,
                             None | Some(LayerContent::SolidColor { .. })
                         ));
-                        println!("sub de_json for SolidColor");
                         // _content = Some(DeJson::de_json(s, i)?);
                     }
                     "shapes" => {
                         s.next_colon(i)?;
-                        dbg!(&_content);
-                        println!("sub de_json for Shape(ShapeGroup)");
                         let parsed_shapes = DeJson::de_json(s, i)?;
                         match _content.as_mut() {
                             None => {
@@ -1152,12 +1119,10 @@ impl DeJson for Layer {
                             _content,
                             None | Some(LayerContent::SolidColor { .. })
                         ));
-                        println!("sub de_json for SolidColor");
                         // _content = Some(DeJson::de_json(s, i)?);
                     }
                     "tm" => {
                         s.next_colon(i)?;
-                        println!("sub de_json for PreCompositionRef");
                         let time_remapping = DeJson::de_json(s, i)?;
                         match _content.as_mut() {
                             None => {
@@ -1178,9 +1143,7 @@ impl DeJson for Layer {
                         _matte_mode = Some(DeJson::de_json(s, i)?);
                     }
                     "ty" => {
-                        println!("sub de_json for Layer");
                         s.next_colon(i)?;
-                        dbg!(&s.tok);
                         match s.tok {
                             DeJsonTok::U64(v) => match v {
                                 0 => {
@@ -1207,7 +1170,6 @@ impl DeJson for Layer {
                     "u" => {
                         s.next_colon(i)?;
                         assert!(matches!(_content, None | Some(LayerContent::Media(_))));
-                        println!("sub de_json for Media");
                         // _content = Some(DeJson::de_json(s, i)?);
                     }
                     "w" => {
@@ -1217,8 +1179,6 @@ impl DeJson for Layer {
                             None | Some(LayerContent::PreCompositionRef(_))
                                 | Some(LayerContent::MediaRef(_))
                         ));
-                        println!("sub de_json for PreCompositionRef");
-                        println!("sub de_json for Media");
                         match _content.as_mut() {
                             Some(LayerContent::PreCompositionRef(PreCompositionRef {
                                 ref mut width,
@@ -1617,7 +1577,6 @@ impl SerJson for ShapeLayer {
         }
         first_field_was_serialized = true;
         s.field(d + 1, "ty");
-        dbg!(&self.shape);
         match &self.shape {
             Shape::Rectangle(rectangle) => {
                 String::ser_json(&"rc".into(), d + 1, s);
@@ -1731,7 +1690,6 @@ fn de_unreachable(s: &mut DeJsonState) {
 impl DeJson for ShapeLayer {
     #[allow(clippy::ignored_unit_patterns)]
     fn de_json(s: &mut DeJsonState, i: &mut Chars) -> Result<Self, DeJsonErr> {
-        println!("de_json for ShapeLayer");
         Ok({
             let mut _name = None;
             let mut _hidden = None;
@@ -1740,7 +1698,6 @@ impl DeJson for ShapeLayer {
             let mut _dashes = None;
             s.curly_open(i)?;
             while let Some(_) = s.next_str() {
-                dbg!(&s.strbuf);
                 match AsRef::<str>::as_ref(&s.strbuf) {
                     "nm" => {
                         s.next_colon(i)?;
@@ -1751,13 +1708,10 @@ impl DeJson for ShapeLayer {
                         _hidden = Some(DeJson::de_json(s, i)?);
                     }
                     "ty" => {
-                        println!("sub de_json for Shape");
                         s.next_colon(i)?;
                         if let Some(_) = s.next_str() {
-                            dbg!(&s.strbuf);
                             match AsRef::<str>::as_ref(&s.strbuf) {
                                 "rc" => {
-                                    println!("sub de_json for Rectangle");
                                     match _shape.as_mut() {
                                         None => {
                                             let mut rect = Rectangle::default();
@@ -1777,7 +1731,6 @@ impl DeJson for ShapeLayer {
                                     }
                                 }
                                 "el" => {
-                                    println!("sub de_json for Ellipse");
                                     match _shape.as_mut() {
                                         None => {
                                             let mut ellipse = Ellipse::default();
@@ -1797,7 +1750,6 @@ impl DeJson for ShapeLayer {
                                     }
                                 }
                                 "gr" => {
-                                    println!("sub de_json for Group");
                                     match _shape.as_ref() {
                                         None => {
                                             _shape = Some(Shape::Group {
@@ -1809,7 +1761,6 @@ impl DeJson for ShapeLayer {
                                     }
                                 }
                                 "fl" => {
-                                    println!("sub de_json for Fill");
                                     match _shape.as_ref() {
                                         None => {
                                             _shape = Some(Shape::Fill(Default::default()));
@@ -1819,7 +1770,6 @@ impl DeJson for ShapeLayer {
                                     }
                                 }
                                 "tr" => {
-                                    println!("sub de_json for Transform");
                                     match _shape.as_ref() {
                                         None => {
                                             _shape = Some(Shape::Transform(Default::default()));
@@ -1829,7 +1779,6 @@ impl DeJson for ShapeLayer {
                                     }
                                 }
                                 "sh" => {
-                                    println!("sub de_json for Path");
                                     match _shape.as_mut() {
                                         None => {
                                             let path = Shape::Path {
@@ -1856,7 +1805,6 @@ impl DeJson for ShapeLayer {
                                     }
                                 }
                                 "st" => {
-                                    println!("sub de_json for Stroke");
                                     match _shape.as_mut() {
                                         None => {
                                             let mut stroke = Stroke::default();
@@ -1876,7 +1824,6 @@ impl DeJson for ShapeLayer {
                                     }
                                 }
                                 "gf" => {
-                                    println!("sub de_json for GradientFill");
                                     match _shape.as_mut() {
                                         None => {
                                             _shape =
@@ -1893,7 +1840,6 @@ impl DeJson for ShapeLayer {
                     }
                     "it" => {
                         s.next_colon(i)?;
-                        println!("sub de_json for Group");
                         let shapes = DeJson::de_json(s, i)?;
                         match _shape.as_mut() {
                             None => {
@@ -1909,10 +1855,6 @@ impl DeJson for ShapeLayer {
                     }
                     "a" => {
                         s.next_colon(i)?;
-                        println!("sub de_json for PuckerBloat");
-                        println!("sub de_json for Twist");
-                        println!("sub de_json for OffsetPath");
-                        println!("sub de_json for Transform");
                         match _shape.as_mut() {
                             Some(Shape::Transform(transform)) => {
                                 transform.anchor = DeJson::de_json(s, i)?;
@@ -1922,9 +1864,6 @@ impl DeJson for ShapeLayer {
                     }
                     "c" => {
                         s.next_colon(i)?;
-                        println!("sub de_json for Twist");
-                        println!("sub de_json for Fill");
-                        println!("sub de_json for Stroke");
                         let color = DeJson::de_json(s, i)?;
                         match _shape.as_mut() {
                             Some(Shape::Fill(fill)) => {
@@ -1942,15 +1881,9 @@ impl DeJson for ShapeLayer {
                     }
                     "d" => {
                         s.next_colon(i)?;
-                        println!("sub de_json for Rectangle");
-                        println!("sub de_json for Ellipse");
-                        println!("sub de_json for Stroke");
-                        println!("sub de_json for Path");
 
-                        dbg!(&_shape);
                         match _shape.as_mut() {
                             None => {
-                                dbg!(&s.tok);
                                 match s.tok {
                                     DeJsonTok::U64(_) => {
                                         _direction = DeJson::de_json(s, i)?;
@@ -1984,7 +1917,6 @@ impl DeJson for ShapeLayer {
                     }
                     "e" => {
                         s.next_colon(i)?;
-                        println!("sub de_json for GradientFill->gradient");
                         match _shape.as_mut() {
                             Some(Shape::GradientFill(gradient_fill)) => {
                                 gradient_fill.gradient.end = DeJson::de_json(s, i)?;
@@ -1994,7 +1926,6 @@ impl DeJson for ShapeLayer {
                     }
                     "g" => {
                         s.next_colon(i)?;
-                        println!("sub de_json for GradientFill->gradient");
                         match _shape.as_mut() {
                             Some(Shape::GradientFill(gradient_fill)) => {
                                 let colors = DeJson::de_json(s, i)?;
@@ -2006,7 +1937,6 @@ impl DeJson for ShapeLayer {
                     }
                     "ks" => {
                         s.next_colon(i)?;
-                        println!("sub de_json for Path");
                         match _shape.as_mut() {
                             Some(Shape::Path {
                                 ref mut data,
@@ -2024,8 +1954,6 @@ impl DeJson for ShapeLayer {
                     }
                     "lc" => {
                         s.next_colon(i)?;
-                        println!("sub de_json for Stroke");
-                        dbg!(&_shape);
                         match _shape.as_mut() {
                             Some(Shape::Stroke(stroke)) => {
                                 if let Some(dashes) = _dashes {
@@ -2039,8 +1967,6 @@ impl DeJson for ShapeLayer {
                     }
                     "lj" => {
                         s.next_colon(i)?;
-                        println!("sub de_json for Stroke");
-                        dbg!(&_shape);
                         match _shape.as_mut() {
                             Some(Shape::Stroke(stroke)) => {
                                 if let Some(dashes) = _dashes {
@@ -2054,8 +1980,6 @@ impl DeJson for ShapeLayer {
                     }
                     "ml" => {
                         s.next_colon(i)?;
-                        println!("sub de_json for Stroke");
-                        dbg!(&_shape);
                         match _shape.as_mut() {
                             Some(Shape::Stroke(stroke)) => {
                                 if let Some(dashes) = _dashes {
@@ -2069,12 +1993,6 @@ impl DeJson for ShapeLayer {
                     }
                     "o" => {
                         s.next_colon(i)?;
-                        println!("sub de_json for GradientFill");
-                        println!("sub de_json for Repeater");
-                        println!("sub de_json for Fill");
-                        println!("sub de_json for Transform");
-                        println!("sub de_json for Stroke");
-                        dbg!(&_shape);
                         match _shape.as_mut() {
                             Some(Shape::GradientFill(gradient_fill)) => {
                                 gradient_fill.opacity = DeJson::de_json(s, i)?;
@@ -2097,9 +2015,6 @@ impl DeJson for ShapeLayer {
                     }
                     "p" => {
                         s.next_colon(i)?;
-                        println!("sub de_json for Transform");
-                        println!("sub de_json for Rectangle");
-                        println!("sub de_json for Ellipse");
                         match _shape.as_mut() {
                             Some(Shape::Rectangle(rectangle)) => {
                                 if let Some(direction) = _direction {
@@ -2123,12 +2038,6 @@ impl DeJson for ShapeLayer {
                     }
                     "r" => {
                         s.next_colon(i)?;
-                        println!("sub de_json for RoundedCorners");
-                        println!("sub de_json for ZigZag");
-                        println!("sub de_json for Rectangle");
-                        println!("sub de_json for Fill");
-                        println!("sub de_json for Transform");
-                        println!("sub de_json for GradientFill");
                         match _shape.as_mut() {
                             Some(Shape::Fill(fill)) => {
                                 fill.fill_rule = DeJson::de_json(s, i)?;
@@ -2154,11 +2063,6 @@ impl DeJson for ShapeLayer {
                     }
                     "s" => {
                         s.next_colon(i)?;
-                        println!("sub de_json for ZigZag");
-                        println!("sub de_json for Rectangle");
-                        println!("sub de_json for Ellipse");
-                        println!("sub de_json for Transform");
-                        println!("sub de_json for GradientFill->gradient");
                         match _shape.as_mut() {
                             Some(Shape::Rectangle(rectangle)) => {
                                 if let Some(direction) = _direction {
@@ -2185,7 +2089,6 @@ impl DeJson for ShapeLayer {
                     }
                     "sk" => {
                         s.next_colon(i)?;
-                        println!("sub de_json for Transform");
                         match _shape.as_mut() {
                             Some(Shape::Transform(transform)) => {
                                 transform.skew = DeJson::de_json(s, i)?;
@@ -2195,7 +2098,6 @@ impl DeJson for ShapeLayer {
                     }
                     "sa" => {
                         s.next_colon(i)?;
-                        println!("sub de_json for Transform");
                         match _shape.as_mut() {
                             Some(Shape::Transform(transform)) => {
                                 transform.skew_axis = DeJson::de_json(s, i)?;
@@ -2205,7 +2107,6 @@ impl DeJson for ShapeLayer {
                     }
                     "t" => {
                         s.next_colon(i)?;
-                        println!("sub de_json for GradientFill->gradient");
                         match _shape.as_mut() {
                             Some(Shape::GradientFill(gradient_fill)) => {
                                 gradient_fill.gradient.gradient_ty = DeJson::de_json(s, i)?;
@@ -2215,8 +2116,6 @@ impl DeJson for ShapeLayer {
                     }
                     "w" => {
                         s.next_colon(i)?;
-                        println!("sub de_json for Stroke");
-                        dbg!(&_shape);
                         match _shape.as_mut() {
                             Some(Shape::Stroke(stroke)) => {
                                 if let Some(dashes) = _dashes {
@@ -2459,7 +2358,6 @@ pub enum TextBased {
 
 impl DeJson for TextBased {
     fn de_json(s: &mut DeJsonState, i: &mut std::str::Chars) -> Result<Self, DeJsonErr> {
-        println!("de_json for TextBased");
 
         match s.tok {
             DeJsonTok::U64(_) => {
@@ -2502,7 +2400,6 @@ pub enum TextShape {
 
 impl DeJson for TextShape {
     fn de_json(s: &mut DeJsonState, i: &mut std::str::Chars) -> Result<Self, DeJsonErr> {
-        println!("de_json for TextShape");
 
         match s.tok {
             DeJsonTok::U64(_) => {
@@ -2600,7 +2497,6 @@ pub enum ShapeDirection {
 
 impl DeJson for ShapeDirection {
     fn de_json(s: &mut DeJsonState, i: &mut std::str::Chars) -> Result<Self, DeJsonErr> {
-        println!("de_json for FillRule");
 
         match s.tok {
             DeJsonTok::U64(_) => {
@@ -2686,7 +2582,6 @@ pub enum FillRule {
 
 impl DeJson for FillRule {
     fn de_json(s: &mut DeJsonState, i: &mut std::str::Chars) -> Result<Self, DeJsonErr> {
-        println!("de_json for FillRule");
 
         match s.tok {
             DeJsonTok::U64(_) => {
@@ -2741,7 +2636,6 @@ pub enum LineCap {
 
 impl DeJson for LineCap {
     fn de_json(s: &mut DeJsonState, i: &mut std::str::Chars) -> Result<Self, DeJsonErr> {
-        println!("de_json for TextJustify");
 
         match s.tok {
             DeJsonTok::U64(_) => {
@@ -2780,7 +2674,6 @@ pub enum LineJoin {
 
 impl DeJson for LineJoin {
     fn de_json(s: &mut DeJsonState, i: &mut std::str::Chars) -> Result<Self, DeJsonErr> {
-        println!("de_json for TextJustify");
 
         match s.tok {
             DeJsonTok::U64(_) => {
@@ -2858,7 +2751,6 @@ pub enum GradientType {
 
 impl DeJson for GradientType {
     fn de_json(s: &mut DeJsonState, i: &mut std::str::Chars) -> Result<Self, DeJsonErr> {
-        println!("de_json for GradientType");
 
         match s.tok {
             DeJsonTok::U64(_) => {
@@ -3119,8 +3011,6 @@ pub struct LegacyKeyFrame<T> {
 
 impl DeJson for KeyFramesFromArray {
     fn de_json(s: &mut DeJsonState, i: &mut Chars) -> Result<Self, DeJsonErr> {
-        println!("de_json for KeyFramesFromArray");
-        dbg!(&s.tok);
         match s.tok {
             DeJsonTok::U64(v) => {
                 s.next_tok(i)?;
@@ -3132,7 +3022,6 @@ impl DeJson for KeyFramesFromArray {
             }
             DeJsonTok::BlockOpen => {
                 s.next_tok(i)?;
-                dbg!(&s.tok);
                 match s.tok {
                     DeJsonTok::F64(v) => {
                         let mut res = vec![v as f32];
@@ -3144,7 +3033,6 @@ impl DeJson for KeyFramesFromArray {
                             s.eat_comma_block(i)?;
                         }
                         s.block_close(i)?;
-                        dbg!(&res);
                         Ok(Self::List(Value::List(res)))
                     }
                     DeJsonTok::U64(v) => {
@@ -3157,7 +3045,6 @@ impl DeJson for KeyFramesFromArray {
                             s.eat_comma_block(i)?;
                         }
                         s.block_close(i)?;
-                        dbg!(&res);
                         Ok(Self::List(Value::List(res)))
                     }
                     DeJsonTok::I64(v) => {
@@ -3170,7 +3057,6 @@ impl DeJson for KeyFramesFromArray {
                             s.eat_comma_block(i)?;
                         }
                         s.block_close(i)?;
-                        dbg!(&res);
                         Ok(Self::List(Value::List(res)))
                     }
                     DeJsonTok::CurlyOpen => {
@@ -3184,7 +3070,6 @@ impl DeJson for KeyFramesFromArray {
                             let mut _easing_in = None;
                             let mut _hold = None;
                             while let Some(_) = s.next_str() {
-                                dbg!(&s.strbuf);
                                 match AsRef::<str>::as_ref(&s.strbuf) {
                                     "s" => {
                                         s.next_colon(i)?;
@@ -3271,7 +3156,6 @@ impl DeJson for KeyFramesFromArray {
                             s.eat_comma_block(i)?;
                         }
                         s.block_close(i)?;
-                        dbg!(&res);
                         Ok(Self::LegacyKeyFrames(res))
                     }
                     _ => Err(s.err_token("U64 or {")),
@@ -3308,7 +3192,6 @@ impl<T: Default + Debug> From<&Vec<KeyFrame<T>>> for KeyFramesFromArray {
 
 impl<T: Clone + Default + FromTo<Value> + Debug> From<&KeyFramesFromArray> for Vec<KeyFrame<T>> {
     fn from(val: &KeyFramesFromArray) -> Vec<KeyFrame<T>> {
-        dbg!(val);
         match val {
             KeyFramesFromArray::Plain(v) => {
                 vec![KeyFrame {
@@ -3370,7 +3253,6 @@ impl<T: Clone + Default + FromTo<Value> + Debug> From<&KeyFramesFromArray> for V
                         }
                     })
                     .collect();
-                dbg!(&res);
                 res
             }
         }
@@ -3435,9 +3317,6 @@ enum ArrayFromArrayOfNumber {
 
 impl DeJson for ArrayFromArrayOfNumber {
     fn de_json(s: &mut DeJsonState, i: &mut Chars) -> Result<Self, DeJsonErr> {
-        println!("de_json for ArrayFromArrayOfNumber");
-        dbg!((s.cur, s.line, s.col));
-        dbg!(&s.tok);
         match s.tok {
             DeJsonTok::U64(_) => {
                 let r = Self::Primitive(s.as_f64()? as f32);
