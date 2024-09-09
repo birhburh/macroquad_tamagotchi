@@ -1,0 +1,403 @@
+{
+    "assets": {
+        "__type__": "Assets",
+        "colors": {
+            "__type__": "NamedColorList",
+            "name": "",
+            "uuid": "3cde58e0-1494-4b05-ab66-3c8a3d164c17",
+            "values": [
+            ]
+        },
+        "compositions": {
+            "__type__": "CompositionList",
+            "name": "",
+            "uuid": "1c44481c-b36c-472b-bdd2-49222847e967",
+            "values": [
+                {
+                    "__type__": "Composition",
+                    "animation": {
+                        "__type__": "AnimationContainer",
+                        "first_frame": 0,
+                        "last_frame": 12
+                    },
+                    "fps": 12,
+                    "group_color": "#00000000",
+                    "height": 512,
+                    "locked": false,
+                    "name": "Composition",
+                    "shapes": [
+                        {
+                            "__type__": "Layer",
+                            "animation": {
+                                "__type__": "AnimationContainer",
+                                "first_frame": 0,
+                                "last_frame": 12
+                            },
+                            "auto_orient": false,
+                            "group_color": "#00000000",
+                            "locked": false,
+                            "mask": {
+                                "__type__": "MaskSettings",
+                                "inverted": false,
+                                "mask": "NoMask"
+                            },
+                            "name": "Rectangle 1",
+                            "opacity": {
+                                "value": 1
+                            },
+                            "parent": null,
+                            "render": true,
+                            "shapes": [
+                                {
+                                    "__type__": "Fill",
+                                    "color": {
+                                        "value": "#ffffff"
+                                    },
+                                    "fill_rule": "NonZero",
+                                    "group_color": "#00000000",
+                                    "locked": false,
+                                    "name": "Fill",
+                                    "opacity": {
+                                        "value": 1
+                                    },
+                                    "use": null,
+                                    "uuid": "62822760-546d-4146-a5a5-d7790f3fe8ec",
+                                    "visible": true
+                                },
+                                {
+                                    "__type__": "Stroke",
+                                    "cap": "RoundCap",
+                                    "color": {
+                                        "value": "#000000"
+                                    },
+                                    "group_color": "#00000000",
+                                    "join": "RoundJoin",
+                                    "locked": false,
+                                    "miter_limit": 4,
+                                    "name": "Stroke",
+                                    "opacity": {
+                                        "value": 1
+                                    },
+                                    "use": null,
+                                    "uuid": "7fa3ed87-c718-47aa-9431-af06b1084517",
+                                    "visible": true,
+                                    "width": {
+                                        "value": 1
+                                    }
+                                },
+                                {
+                                    "__type__": "Rect",
+                                    "group_color": "#00000000",
+                                    "locked": false,
+                                    "name": "Rectangle 1",
+                                    "position": {
+                                        "value": {
+                                            "x": 417.3061224489795,
+                                            "y": 373.2244897959183
+                                        }
+                                    },
+                                    "reversed": false,
+                                    "rounded": {
+                                        "value": 0
+                                    },
+                                    "size": {
+                                        "value": {
+                                            "height": 167.51020408163265,
+                                            "width": 155.75510204081633
+                                        }
+                                    },
+                                    "uuid": "d32c3583-af9e-4696-846a-63bf4bb47d73",
+                                    "visible": true
+                                }
+                            ],
+                            "transform": {
+                                "__type__": "Transform",
+                                "anchor_point": {
+                                    "value": {
+                                        "x": 417.3061224489795,
+                                        "y": 373.2244897959183
+                                    }
+                                },
+                                "position": {
+                                    "value": {
+                                        "x": 417.3061224489795,
+                                        "y": 373.2244897959183
+                                    }
+                                },
+                                "rotation": {
+                                    "value": 0
+                                },
+                                "scale": {
+                                    "value": {
+                                        "x": 1,
+                                        "y": 1
+                                    }
+                                }
+                            },
+                            "uuid": "099af5bd-94ac-4ca6-9f1b-79b90524b76d",
+                            "visible": true
+                        },
+                        {
+                            "__type__": "PreCompLayer",
+                            "composition": "33b68677-e521-429c-b11c-ea5a69de6942",
+                            "group_color": "#00000000",
+                            "locked": false,
+                            "name": "Composition Layer",
+                            "opacity": {
+                                "value": 1
+                            },
+                            "size": {
+                                "height": 512,
+                                "width": 512
+                            },
+                            "timing": {
+                                "__type__": "StretchableTime",
+                                "start_time": 0,
+                                "stretch": 1
+                            },
+                            "transform": {
+                                "__type__": "Transform",
+                                "anchor_point": {
+                                    "value": {
+                                        "x": 0,
+                                        "y": 0
+                                    }
+                                },
+                                "position": {
+                                    "value": {
+                                        "x": 0,
+                                        "y": 0
+                                    }
+                                },
+                                "rotation": {
+                                    "value": 0
+                                },
+                                "scale": {
+                                    "value": {
+                                        "x": 1,
+                                        "y": 1
+                                    }
+                                }
+                            },
+                            "uuid": "59d4bff2-bb62-423a-9f4b-2f472f25c1f4",
+                            "visible": true
+                        }
+                    ],
+                    "uuid": "b2eadabe-7314-461e-8c25-282f57ea4f00",
+                    "visible": true,
+                    "width": 512
+                },
+                {
+                    "__type__": "Composition",
+                    "animation": {
+                        "__type__": "AnimationContainer",
+                        "first_frame": 0,
+                        "last_frame": 12
+                    },
+                    "fps": 12,
+                    "group_color": "#00000000",
+                    "height": 512,
+                    "locked": false,
+                    "name": "Rectangle",
+                    "shapes": [
+                        {
+                            "__type__": "Layer",
+                            "animation": {
+                                "__type__": "AnimationContainer",
+                                "first_frame": 0,
+                                "last_frame": 12
+                            },
+                            "auto_orient": false,
+                            "group_color": "#00000000",
+                            "locked": false,
+                            "mask": {
+                                "__type__": "MaskSettings",
+                                "inverted": false,
+                                "mask": "NoMask"
+                            },
+                            "name": "Rectangle",
+                            "opacity": {
+                                "value": 1
+                            },
+                            "parent": null,
+                            "render": true,
+                            "shapes": [
+                                {
+                                    "__type__": "Group",
+                                    "auto_orient": false,
+                                    "group_color": "#00000000",
+                                    "locked": false,
+                                    "name": "Rectangle",
+                                    "opacity": {
+                                        "value": 1
+                                    },
+                                    "shapes": [
+                                        {
+                                            "__type__": "Fill",
+                                            "color": {
+                                                "value": "#b10000"
+                                            },
+                                            "fill_rule": "NonZero",
+                                            "group_color": "#00000000",
+                                            "locked": false,
+                                            "name": "Fill",
+                                            "opacity": {
+                                                "value": 1
+                                            },
+                                            "use": null,
+                                            "uuid": "9bf8e4da-a423-4afb-9b1f-f73e4660821c",
+                                            "visible": true
+                                        },
+                                        {
+                                            "__type__": "Stroke",
+                                            "cap": "RoundCap",
+                                            "color": {
+                                                "value": "#000000"
+                                            },
+                                            "group_color": "#00000000",
+                                            "join": "RoundJoin",
+                                            "locked": false,
+                                            "miter_limit": 4,
+                                            "name": "Stroke",
+                                            "opacity": {
+                                                "value": 1
+                                            },
+                                            "use": null,
+                                            "uuid": "75bef5d3-b833-45e1-823f-859c7b0e9c85",
+                                            "visible": true,
+                                            "width": {
+                                                "value": 1
+                                            }
+                                        },
+                                        {
+                                            "__type__": "Rect",
+                                            "group_color": "#00000000",
+                                            "locked": false,
+                                            "name": "Rectangle",
+                                            "position": {
+                                                "value": {
+                                                    "x": 160.89795918367344,
+                                                    "y": 141.0612244897959
+                                                }
+                                            },
+                                            "reversed": false,
+                                            "rounded": {
+                                                "value": 0
+                                            },
+                                            "size": {
+                                                "value": {
+                                                    "height": 188.0816326530612,
+                                                    "width": 198.36734693877548
+                                                }
+                                            },
+                                            "uuid": "87fc2338-7cdb-49e4-9dfd-0b50e3c33535",
+                                            "visible": true
+                                        }
+                                    ],
+                                    "transform": {
+                                        "__type__": "Transform",
+                                        "anchor_point": {
+                                            "value": {
+                                                "x": 160.89795918367344,
+                                                "y": 141.0612244897959
+                                            }
+                                        },
+                                        "position": {
+                                            "value": {
+                                                "x": 160.89795918367344,
+                                                "y": 141.0612244897959
+                                            }
+                                        },
+                                        "rotation": {
+                                            "value": 0
+                                        },
+                                        "scale": {
+                                            "value": {
+                                                "x": 1,
+                                                "y": 1
+                                            }
+                                        }
+                                    },
+                                    "uuid": "9e437491-6fb7-429c-8f08-11b36065f5f2",
+                                    "visible": true
+                                }
+                            ],
+                            "transform": {
+                                "__type__": "Transform",
+                                "anchor_point": {
+                                    "value": {
+                                        "x": 0,
+                                        "y": 0
+                                    }
+                                },
+                                "position": {
+                                    "value": {
+                                        "x": 0,
+                                        "y": 0
+                                    }
+                                },
+                                "rotation": {
+                                    "value": 0
+                                },
+                                "scale": {
+                                    "value": {
+                                        "x": 1,
+                                        "y": 1
+                                    }
+                                }
+                            },
+                            "uuid": "ba2b232f-a973-4e62-bf1f-ac4453fe6a9a",
+                            "visible": true
+                        }
+                    ],
+                    "uuid": "33b68677-e521-429c-b11c-ea5a69de6942",
+                    "visible": true,
+                    "width": 512
+                }
+            ]
+        },
+        "fonts": {
+            "__type__": "FontList",
+            "name": "",
+            "uuid": "3237170c-d783-4ae8-97c1-af751d7da1e9",
+            "values": [
+            ]
+        },
+        "gradient_colors": {
+            "__type__": "GradientColorsList",
+            "name": "",
+            "uuid": "88bf45ae-8ff4-4202-b90f-e8b5f23af157",
+            "values": [
+            ]
+        },
+        "gradients": {
+            "__type__": "GradientList",
+            "name": "",
+            "uuid": "ef5c341c-7dd0-4f74-bf7e-cf52508ca21d",
+            "values": [
+            ]
+        },
+        "images": {
+            "__type__": "BitmapList",
+            "name": "",
+            "uuid": "1a6eef3d-51dd-40fa-bf27-6be4b7f7fe86",
+            "values": [
+            ]
+        },
+        "name": "",
+        "uuid": "f4d07618-8f2d-4f7a-81d4-5b1dc61bdbd1"
+    },
+    "format": {
+        "format_version": 8,
+        "generator": "Glaxnimate",
+        "generator_version": "0.5.5+mac-9c9677a5"
+    },
+    "info": {
+        "author": "",
+        "description": "",
+        "keywords": [
+        ]
+    },
+    "metadata": {
+    }
+}

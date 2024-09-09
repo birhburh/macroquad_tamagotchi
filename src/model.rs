@@ -1,4 +1,7 @@
 // Based on https://github.com/zimond/lottie-rs/
+// Also based on https://github.com/lottie/lottie-spec
+// Also based on https://lottiefiles.github.io/lottie-docs/schema/
+// Some of the fields I just added because they were in glaxnimate format itself
 
 // nanoserde TODO:
 // - implement ((serialize|deserialize)_)?with
@@ -11,7 +14,7 @@
 
 use {
     nanoserde::{DeJson, DeJsonErr, DeJsonState, DeJsonTok, SerJson, SerJsonState},
-    std::{fmt::Debug, vec},
+    std::{fmt::Debug, str::Chars, vec},
 };
 
 #[derive(Clone, Debug)]
@@ -34,7 +37,7 @@ impl Value {
 }
 
 impl DeJson for Value {
-    fn de_json(s: &mut DeJsonState, i: &mut core::str::Chars) -> Result<Self, DeJsonErr> {
+    fn de_json(s: &mut DeJsonState, i: &mut Chars) -> Result<Self, DeJsonErr> {
         println!("de_json for Value");
         dbg!(&s.tok);
         match s.tok {
@@ -301,7 +304,6 @@ mod vector_2_d {
         #[allow(clippy::ignored_unit_patterns)]
         fn de_json(s: &mut DeJsonState, i: &mut Chars) -> Result<Self, DeJsonErr> {
             println!("de_json for Vector2D");
-            dbg!(&s.col);
             s.block_open(i)?;
             let x: f32 = {
                 let r = DeJson::de_json(s, i)?;
@@ -357,6 +359,8 @@ impl FromTo<Value> for Vector2D {
 pub struct Model {
     #[nserde(rename = "nm")]
     pub name: Option<String>,
+    #[nserde(rename = "mn", skip)]
+    pub match_name: Option<String>,
     #[nserde(rename = "v", default)]
     version: Option<String>,
     #[nserde(rename = "ip")]
@@ -376,20 +380,310 @@ pub struct Model {
     pub fonts: FontList,
 }
 
-#[derive(SerJson, DeJson, Debug, Clone)]
-// #[nserde(untagged)]
+#[derive(Debug, Clone)]
 pub enum Asset {
     Media(Media),
-    Sound,
     Precomposition(Precomposition),
 }
 
-#[derive(SerJson, DeJson, Debug, Clone)]
+impl DeJson for Asset {
+    fn de_json(s: &mut DeJsonState, i: &mut Chars) -> Result<Self, DeJsonErr> {
+        println!("de_json for Asset");
+        dbg!(&s.tok);
+        match s.tok {
+            DeJsonTok::CurlyOpen => {
+                let mut _asset = None;
+                let mut _name = None;
+                let mut _match_name = None;
+                let mut _id = None;
+                s.next_tok(i)?;
+                {
+                    while let Some(_) = s.next_str() {
+                        dbg!(&s.strbuf);
+                        match AsRef::<str>::as_ref(&s.strbuf) {
+                            "e" => {
+                                s.next_colon(i)?;
+                                match _asset.as_mut() {
+                                    Some(Asset::Media(media)) => {
+                                        if let Some(match_name) = _match_name {
+                                            media.match_name = match_name;
+                                            _match_name = None;
+                                        }
+                                        if let Some(name) = _name {
+                                            media.name = name;
+                                            _name = None;
+                                        }
+                                        if let Some(id) = _id {
+                                            media.id = id;
+                                            _id = None;
+                                        }
+                                        let embedded = DeJson::de_json(s, i)?;
+                                        media.embedded = From::<&BoolFromInt>::from(&embedded);
+                                    }
+                                    _ => de_unreachable(s),
+                                }
+                            }
+                            "fr" => {
+                                s.next_colon(i)?;
+                                dbg!(&_asset);
+                                match _asset.as_mut() {
+                                    None => {
+                                        let mut precomposition = Precomposition::default();
+                                        if let Some(name) = _name {
+                                            precomposition.name = name;
+                                            _name = None;
+                                        }
+                                        if let Some(match_name) = _match_name {
+                                            precomposition.match_name = match_name;
+                                            _match_name = None;
+                                        }
+                                        if let Some(id) = _id {
+                                            precomposition.id = id;
+                                            _id = None;
+                                        }
+                                        precomposition.frame_rate = DeJson::de_json(s, i)?;
+                                        _asset = Some(Asset::Precomposition(precomposition));
+                                    }
+                                    Some(Asset::Precomposition(precomposition)) => {
+                                        if let Some(name) = _name {
+                                            precomposition.name = name;
+                                            _name = None;
+                                        }
+                                        if let Some(match_name) = _match_name {
+                                            precomposition.match_name = match_name;
+                                            _match_name = None;
+                                        }
+                                        if let Some(id) = _id {
+                                            precomposition.id = id;
+                                            _id = None;
+                                        }
+                                        precomposition.frame_rate = DeJson::de_json(s, i)?;
+                                    }
+                                    _ => de_unreachable(s),
+                                }
+                            }
+                            "h" => {
+                                s.next_colon(i)?;
+                                match _asset.as_mut() {
+                                    Some(Asset::Media(media)) => {
+                                        if let Some(name) = _name {
+                                            media.name = name;
+                                            _name = None;
+                                        }
+                                        if let Some(match_name) = _match_name {
+                                            media.match_name = match_name;
+                                            _match_name = None;
+                                        }
+                                        if let Some(id) = _id {
+                                            media.id = id;
+                                            _id = None;
+                                        }
+                                        media.height = DeJson::de_json(s, i)?;
+                                    }
+                                    Some(Asset::Precomposition(precomposition)) => {
+                                        if let Some(name) = _name {
+                                            precomposition.name = name;
+                                            _name = None;
+                                        }
+                                        if let Some(match_name) = _match_name {
+                                            precomposition.match_name = match_name;
+                                            _match_name = None;
+                                        }
+                                        if let Some(id) = _id {
+                                            precomposition.id = id;
+                                            _id = None;
+                                        }
+                                        precomposition.height = DeJson::de_json(s, i)?;
+                                    }
+                                    _ => de_unreachable(s),
+                                }
+                            }
+                            "id" => {
+                                s.next_colon(i)?;
+                                match _asset.as_mut() {
+                                    None => {
+                                        _id = DeJson::de_json(s, i)?;
+                                    }
+                                    Some(Asset::Media(media)) => {
+                                        media.id = DeJson::de_json(s, i)?;
+                                    }
+                                    Some(Asset::Precomposition(precomposition)) => {
+                                        precomposition.id = DeJson::de_json(s, i)?;
+                                    }
+                                    _ => de_unreachable(s),
+                                }
+                            }
+                            "layers" => {
+                                s.next_colon(i)?;
+                                match _asset.as_mut() {
+                                    Some(Asset::Precomposition(precomposition)) => {
+                                        if let Some(name) = _name {
+                                            precomposition.name = name;
+                                            _name = None;
+                                        }
+                                        if let Some(match_name) = _match_name {
+                                            precomposition.match_name = match_name;
+                                            _match_name = None;
+                                        }
+                                        if let Some(id) = _id {
+                                            precomposition.id = id;
+                                            _id = None;
+                                        }
+                                        precomposition.layers = DeJson::de_json(s, i)?;
+                                    }
+                                    _ => de_unreachable(s),
+                                }
+                            }
+                            "mn" => {
+                                s.next_colon(i)?;
+                                match _asset.as_mut() {
+                                    None => {
+                                        _match_name = DeJson::de_json(s, i)?;
+                                    }
+                                    Some(Asset::Media(media)) => {
+                                        media.match_name = DeJson::de_json(s, i)?;
+                                    }
+                                    Some(Asset::Precomposition(precomposition)) => {
+                                        precomposition.match_name = DeJson::de_json(s, i)?;
+                                    }
+                                    _ => de_unreachable(s),
+                                }
+                            }
+                            "nm" => {
+                                s.next_colon(i)?;
+                                match _asset.as_mut() {
+                                    None => {
+                                        _name = DeJson::de_json(s, i)?;
+                                    }
+                                    Some(Asset::Media(media)) => {
+                                        media.name = DeJson::de_json(s, i)?;
+                                    }
+                                    Some(Asset::Precomposition(precomposition)) => {
+                                        precomposition.name = DeJson::de_json(s, i)?;
+                                    }
+                                    _ => de_unreachable(s),
+                                }
+                            }
+                            "p" => {
+                                s.next_colon(i)?;
+                                match _asset.as_mut() {
+                                    Some(Asset::Media(media)) => {
+                                        if let Some(name) = _name {
+                                            media.name = name;
+                                            _name = None;
+                                        }
+                                        if let Some(match_name) = _match_name {
+                                            media.match_name = match_name;
+                                            _match_name = None;
+                                        }
+                                        if let Some(id) = _id {
+                                            media.id = id;
+                                            _id = None;
+                                        }
+                                        media.filename = DeJson::de_json(s, i)?;
+                                    }
+                                    _ => de_unreachable(s),
+                                }
+                            }
+                            "u" => {
+                                s.next_colon(i)?;
+                                match _asset.as_mut() {
+                                    Some(Asset::Media(media)) => {
+                                        if let Some(name) = _name {
+                                            media.name = name;
+                                            _name = None;
+                                        }
+                                        if let Some(match_name) = _match_name {
+                                            media.match_name = match_name;
+                                            _match_name = None;
+                                        }
+                                        if let Some(id) = _id {
+                                            media.id = id;
+                                            _id = None;
+                                        }
+                                        media.pwd = DeJson::de_json(s, i)?;
+                                    }
+                                    _ => de_unreachable(s),
+                                }
+                            }
+                            "w" => {
+                                s.next_colon(i)?;
+                                dbg!(&_asset);
+                                match _asset.as_mut() {
+                                    Some(Asset::Media(media)) => {
+                                        if let Some(name) = _name {
+                                            media.name = name;
+                                            _name = None;
+                                        }
+                                        if let Some(match_name) = _match_name {
+                                            media.match_name = match_name;
+                                            _match_name = None;
+                                        }
+                                        if let Some(id) = _id {
+                                            media.id = id;
+                                            _id = None;
+                                        }
+                                        media.width = DeJson::de_json(s, i)?;
+                                    }
+                                    Some(Asset::Precomposition(precomposition)) => {
+                                        if let Some(name) = _name {
+                                            precomposition.name = name;
+                                            _name = None;
+                                        }
+                                        if let Some(match_name) = _match_name {
+                                            precomposition.match_name = match_name;
+                                            _match_name = None;
+                                        }
+                                        if let Some(id) = _id {
+                                            precomposition.id = id;
+                                            _id = None;
+                                        }
+                                        precomposition.width = DeJson::de_json(s, i)?;
+                                    }
+                                    _ => de_unreachable(s),
+                                }
+                            }
+                            _ => de_unreachable(s),
+                        }
+                        s.eat_comma_curly(i)?
+                    }
+                    s.curly_close(i)?;
+                }
+                s.eat_comma_block(i)?;
+                println!("END de_json for Asset");
+                Ok(_asset.expect("Not supported asset type"))
+            }
+            _ => Err(s.err_token("{")),
+        }
+    }
+}
+
+impl SerJson for Asset {
+    fn ser_json(&self, d: usize, s: &mut SerJsonState) {
+        match self {
+            Self::Media(media) => {
+                media.ser_json(d, s);
+            }
+            Self::Precomposition(precomposition) => {
+                precomposition.ser_json(d, s);
+            }
+            _ => todo!(),
+        }
+    }
+}
+
+#[derive(SerJson, DeJson, Debug, Clone, Default)]
 pub struct Precomposition {
     pub id: String,
     pub layers: Vec<Layer>,
     #[nserde(rename = "nm")]
     name: Option<String>,
+    #[nserde(rename = "mn", skip)]
+    pub match_name: Option<String>,
+    #[nserde(rename = "w", default, skip)]
+    pub width: Option<u32>,
+    #[nserde(rename = "h", default, skip)]
+    pub height: Option<u32>,
     #[nserde(rename = "fr")]
     pub frame_rate: Option<f32>,
 }
@@ -493,26 +787,181 @@ pub struct Layer {
     pub end_frame: f32,
     pub start_time: f32,
     pub name: Option<String>,
+    pub match_name: Option<String>,
     pub transform: Option<Transform>,
     pub content: LayerContent,
-    // #[nserde(rename = "tt", default)]
-    // pub matte_mode: Option<MatteMode>,
-    // #[nserde(rename = "bm", default)]
-    // pub blend_mode: Option<BlendMode>,
-    // #[nserde(default, rename = "hasMask")]
-    // pub has_mask: bool,
-    // #[nserde(default, rename = "masksProperties")]
-    // pub masks_properties: Vec<Mask>,
+    pub time_stretch: Option<f32>,
+    pub matte_mode: Option<MatteMode>,
+    pub blend_mode: Option<BlendMode>,
+    pub has_mask: bool,
+    pub masks_properties: Vec<Mask>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+#[repr(u8)]
+pub enum MatteMode {
+    Normal = 0,
+    Alpha = 1,
+    InvertedAlpha = 2,
+    Luma = 3,
+    InvertedLuma = 4,
+}
+
+impl DeJson for MatteMode {
+    fn de_json(s: &mut DeJsonState, i: &mut std::str::Chars) -> Result<Self, DeJsonErr> {
+        println!("de_json for MatteMode");
+
+        match s.tok {
+            DeJsonTok::U64(_) => {
+                let r = s.as_f64()? as u8;
+                s.next_tok(i)?;
+                match r {
+                    0 => Ok(Self::Normal),
+                    1 => Ok(Self::Alpha),
+                    2 => Ok(Self::InvertedAlpha),
+                    3 => Ok(Self::Luma),
+                    4 => Ok(Self::InvertedLuma),
+                    _ => Err(s.err_range("0..4")),
+                }
+            }
+            _ => Err(s.err_token("F64")),
+        }
+    }
+}
+
+impl SerJson for MatteMode {
+    fn ser_json(&self, d: usize, s: &mut SerJsonState) {
+        match self {
+            Self::Normal => 0.ser_json(d, s),
+            Self::Alpha => 1.ser_json(d, s),
+            Self::InvertedAlpha => 2.ser_json(d, s),
+            Self::Luma => 3.ser_json(d, s),
+            Self::InvertedLuma => 4.ser_json(d, s),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+#[repr(u8)]
+pub enum BlendMode {
+    Normal = 0,
+    Multiply,
+    Screen,
+    Overlay,
+    Darken,
+    Lighten,
+    ColorDodge,
+    ColorBurn,
+    HighLight,
+    SoftLight,
+    Difference,
+    Exclusion,
+    Hue,
+    Saturation,
+    Color,
+    Luminosity,
+    Add,
+    HardMix,
+}
+
+impl DeJson for BlendMode {
+    fn de_json(s: &mut DeJsonState, i: &mut std::str::Chars) -> Result<Self, DeJsonErr> {
+        println!("de_json for BlendMode");
+
+        match s.tok {
+            DeJsonTok::U64(_) => {
+                let r = s.as_f64()? as u8;
+                s.next_tok(i)?;
+                match r {
+                    0 => Ok(Self::Normal),
+                    1 => Ok(Self::Multiply),
+                    2 => Ok(Self::Screen),
+                    3 => Ok(Self::Overlay),
+                    4 => Ok(Self::Darken),
+                    5 => Ok(Self::Lighten),
+                    6 => Ok(Self::ColorDodge),
+                    7 => Ok(Self::ColorBurn),
+                    8 => Ok(Self::HighLight),
+                    9 => Ok(Self::SoftLight),
+                    10 => Ok(Self::Difference),
+                    11 => Ok(Self::Exclusion),
+                    12 => Ok(Self::Hue),
+                    13 => Ok(Self::Saturation),
+                    14 => Ok(Self::Color),
+                    15 => Ok(Self::Luminosity),
+                    16 => Ok(Self::Add),
+                    17 => Ok(Self::HardMix),
+                    _ => Err(s.err_range("0..17")),
+                }
+            }
+            _ => Err(s.err_token("F64")),
+        }
+    }
+}
+
+impl SerJson for BlendMode {
+    fn ser_json(&self, d: usize, s: &mut SerJsonState) {
+        match self {
+            Self::Normal => 0.ser_json(d, s),
+            Self::Multiply => 1.ser_json(d, s),
+            Self::Screen => 2.ser_json(d, s),
+            Self::Overlay => 3.ser_json(d, s),
+            Self::Darken => 4.ser_json(d, s),
+            Self::Lighten => 5.ser_json(d, s),
+            Self::ColorDodge => 6.ser_json(d, s),
+            Self::ColorBurn => 7.ser_json(d, s),
+            Self::HighLight => 8.ser_json(d, s),
+            Self::SoftLight => 9.ser_json(d, s),
+            Self::Difference => 10.ser_json(d, s),
+            Self::Exclusion => 11.ser_json(d, s),
+            Self::Hue => 12.ser_json(d, s),
+            Self::Saturation => 13.ser_json(d, s),
+            Self::Color => 14.ser_json(d, s),
+            Self::Luminosity => 15.ser_json(d, s),
+            Self::Add => 16.ser_json(d, s),
+            Self::HardMix => 17.ser_json(d, s),
+        }
+    }
+}
+
+#[derive(SerJson, DeJson, Debug, Clone)]
+pub struct Mask {
+    #[nserde(rename = "nm", default)]
+    pub name: String,
+    #[nserde(rename = "inv", default)]
+    inverted: bool,
+    #[nserde(rename = "pt")]
+    pub points: Animated<Vec<Bezier>>,
+    #[nserde(rename = "o")]
+    pub opacity: Animated<f32>,
+    pub mode: MaskMode,
+    #[nserde(rename = "e", default)]
+    expand: Option<Animated<f32>>,
+}
+
+#[derive(SerJson, DeJson, Debug, Clone, Copy)]
+pub enum MaskMode {
+    #[nserde(rename = "n")]
+    None,
+    #[nserde(rename = "a")]
+    Add,
+    #[nserde(rename = "s")]
+    Subtract,
+    #[nserde(rename = "i")]
+    Intersect,
+    #[nserde(rename = "l")]
+    Lighten,
+    #[nserde(rename = "d")]
+    Darken,
+    #[nserde(rename = "f")]
+    Difference,
 }
 
 impl DeJson for Layer {
     #[allow(clippy::ignored_unit_patterns)]
-    fn de_json(
-        s: &mut DeJsonState,
-        i: &mut core::str::Chars,
-    ) -> ::core::result::Result<Self, DeJsonErr> {
+    fn de_json(s: &mut DeJsonState, i: &mut Chars) -> Result<Self, DeJsonErr> {
         println!("de_json for Layer\n");
-        ::core::result::Result::Ok({
+        Ok({
             let mut _is_3d = None;
             let mut _hidden = None;
             let mut _index = None;
@@ -520,16 +969,74 @@ impl DeJson for Layer {
             let mut _auto_orient = None;
             let mut _start_frame = None;
             let mut _end_frame = None;
+            let mut _time_stretch = None;
+            let mut _matte_mode = None;
+            let mut _blend_mode = None;
+            let mut _has_mask = None;
+            let mut _masks_properties = None;
             let mut _start_time = None;
             let mut _name = None;
+            let mut _match_name = None;
             let mut _transform = None;
             let mut _content = None;
+
             s.curly_open(i)?;
             while let Some(_) = s.next_str() {
+                dbg!(&s.strbuf);
                 match AsRef::<str>::as_ref(&s.strbuf) {
+                    "a" => {
+                        s.next_colon(i)?;
+                        // assert!(matches!(
+                        //     _content,
+                        //     None | Some(LayerContent::Text(_))
+                        // ));
+                        println!("sub de_json for Text(TextAnimationData)");
+                        // _content = Some(DeJson::de_json(s, i)?);
+                    }
+                    "ao" => {
+                        s.next_colon(i)?;
+                        _auto_orient = Some(DeJson::de_json(s, i)?);
+                    }
+                    "bm" => {
+                        s.next_colon(i)?;
+                        _blend_mode = Some(DeJson::de_json(s, i)?);
+                    }
+                    "d" => {
+                        s.next_colon(i)?;
+                        // assert!(matches!(
+                        //     _content,
+                        //     None | Some(LayerContent::Text(_))
+                        // ));
+                        println!("sub de_json for Text(TextAnimationData)");
+                        // _content = Some(DeJson::de_json(s, i)?);
+                    }
                     "ddd" => {
                         s.next_colon(i)?;
                         _is_3d = Some(DeJson::de_json(s, i)?);
+                    }
+                    "e" => {
+                        s.next_colon(i)?;
+                        assert!(matches!(_content, None | Some(LayerContent::Media(_))));
+                        println!("sub de_json for Media");
+                        // _content = Some(DeJson::de_json(s, i)?);
+                    }
+                    "h" => {
+                        s.next_colon(i)?;
+                        println!("sub de_json for PreCompositionRef");
+                        println!("sub de_json for Media");
+                        match _content.as_mut() {
+                            Some(LayerContent::PreCompositionRef(PreCompositionRef {
+                                ref mut height,
+                                ..
+                            })) => {
+                                *height = DeJson::de_json(s, i)?;
+                            }
+                            _ => de_unreachable(s),
+                        }
+                    }
+                    "hasMask" => {
+                        s.next_colon(i)?;
+                        _has_mask = Some(DeJson::de_json(s, i)?);
                     }
                     "hd" => {
                         s.next_colon(i)?;
@@ -539,50 +1046,113 @@ impl DeJson for Layer {
                         s.next_colon(i)?;
                         _index = Some(DeJson::de_json(s, i)?);
                     }
-                    "parent" => {
-                        s.next_colon(i)?;
-                        _parent_index = Some(DeJson::de_json(s, i)?);
-                    }
-                    "ao" => {
-                        s.next_colon(i)?;
-                        _auto_orient = Some(DeJson::de_json(s, i)?);
-                    }
                     "ip" => {
                         s.next_colon(i)?;
                         _start_frame = Some(DeJson::de_json(s, i)?);
-                    }
-                    "op" => {
-                        s.next_colon(i)?;
-                        _end_frame = Some(DeJson::de_json(s, i)?);
-                    }
-                    "st" => {
-                        s.next_colon(i)?;
-                        _start_time = Some(DeJson::de_json(s, i)?);
                     }
                     "ks" => {
                         s.next_colon(i)?;
                         _transform = Some(DeJson::de_json(s, i)?);
                     }
-                    "refId" => {
+                    "m" => {
                         s.next_colon(i)?;
-                        assert!(matches!(
-                            _content,
-                            None | Some(LayerContent::PreCompositionRef(_))
-                                | Some(LayerContent::MediaRef(_))
-                        ));
-                        println!("sub de_json for PreCompositionRef");
-                        println!("sub de_json for MediaRef");
+                        // assert!(matches!(
+                        //     _content,
+                        //     None | Some(LayerContent::Text(_))
+                        // ));
+                        println!("sub de_json for Text(TextAnimationData)");
                         // _content = Some(DeJson::de_json(s, i)?);
                     }
-                    "w" | "h" => {
+                    "masksProperties" => {
+                        s.next_colon(i)?;
+                        _masks_properties = Some(DeJson::de_json(s, i)?);
+                    }
+                    "nm" => {
+                        s.next_colon(i)?;
+                        _name = Some(DeJson::de_json(s, i)?);
+                    }
+                    "mn" => {
+                        s.next_colon(i)?;
+                        _match_name = Some(DeJson::de_json(s, i)?);
+                    }
+                    "op" => {
+                        s.next_colon(i)?;
+                        _end_frame = Some(DeJson::de_json(s, i)?);
+                    }
+                    "p" => {
+                        s.next_colon(i)?;
+                        println!("sub de_json for Text(TextAnimationData)");
+                        println!("sub de_json for Media");
+                        // _content = Some(DeJson::de_json(s, i)?);
+                    }
+                    "parent" => {
+                        s.next_colon(i)?;
+                        _parent_index = Some(DeJson::de_json(s, i)?);
+                    }
+                    "refId" => {
+                        s.next_colon(i)?;
+                        println!("sub de_json for PreCompositionRef");
+                        println!("sub de_json for MediaRef");
+                        match _content.as_mut() {
+                            Some(LayerContent::PreCompositionRef(PreCompositionRef {
+                                ref mut ref_id,
+                                ..
+                            })) => {
+                                *ref_id = DeJson::de_json(s, i)?;
+                            }
+                            _ => de_unreachable(s),
+                        }
+                    }
+                    "sc" => {
                         s.next_colon(i)?;
                         assert!(matches!(
                             _content,
-                            None | Some(LayerContent::PreCompositionRef(_))
-                                | Some(LayerContent::MediaRef(_))
+                            None | Some(LayerContent::SolidColor { .. })
                         ));
-                        println!("sub de_json for PreCompositionRef");
-                        println!("sub de_json for Media");
+                        println!("sub de_json for SolidColor");
+                        // _content = Some(DeJson::de_json(s, i)?);
+                    }
+                    "sh" => {
+                        s.next_colon(i)?;
+                        assert!(matches!(
+                            _content,
+                            None | Some(LayerContent::SolidColor { .. })
+                        ));
+                        println!("sub de_json for SolidColor");
+                        // _content = Some(DeJson::de_json(s, i)?);
+                    }
+                    "shapes" => {
+                        s.next_colon(i)?;
+                        dbg!(&_content);
+                        println!("sub de_json for Shape(ShapeGroup)");
+                        let parsed_shapes = DeJson::de_json(s, i)?;
+                        match _content.as_mut() {
+                            None => {
+                                _content = Some(LayerContent::Shape(ShapeGroup {
+                                    shapes: parsed_shapes,
+                                }));
+                            }
+                            Some(LayerContent::Shape(ShapeGroup { ref mut shapes })) => {
+                                *shapes = parsed_shapes
+                            }
+                            _ => de_unreachable(s),
+                        }
+                    }
+                    "sr" => {
+                        s.next_colon(i)?;
+                        _time_stretch = Some(DeJson::de_json(s, i)?);
+                    }
+                    "st" => {
+                        s.next_colon(i)?;
+                        _start_time = Some(DeJson::de_json(s, i)?);
+                    }
+                    "sw" => {
+                        s.next_colon(i)?;
+                        assert!(matches!(
+                            _content,
+                            None | Some(LayerContent::SolidColor { .. })
+                        ));
+                        println!("sub de_json for SolidColor");
                         // _content = Some(DeJson::de_json(s, i)?);
                     }
                     "tm" => {
@@ -603,59 +1173,63 @@ impl DeJson for Layer {
                             _ => unreachable!(),
                         }
                     }
-                    "shapes" => {
+                    "tt" => {
                         s.next_colon(i)?;
-                        assert!(matches!(_content, None));
-                        println!("sub de_json for Shape(ShapeGroup)");
-                        let shapes = DeJson::de_json(s, i)?;
-                        match _content.as_mut() {
-                            None => {
-                                _content = Some(LayerContent::Shape(ShapeGroup { shapes }));
-                            }
-                            _ => unreachable!(),
+                        _matte_mode = Some(DeJson::de_json(s, i)?);
+                    }
+                    "ty" => {
+                        println!("sub de_json for Layer");
+                        s.next_colon(i)?;
+                        dbg!(&s.tok);
+                        match s.tok {
+                            DeJsonTok::U64(v) => match v {
+                                0 => {
+                                    _content =
+                                        Some(LayerContent::PreCompositionRef(Default::default()))
+                                }
+                                1 => {
+                                    _content = Some(LayerContent::SolidColor {
+                                        color: Default::default(),
+                                        width: Default::default(),
+                                        height: Default::default(),
+                                    })
+                                }
+                                2 => _content = Some(LayerContent::MediaRef(Default::default())),
+                                3 => _content = Some(LayerContent::Empty),
+                                4 => _content = Some(LayerContent::Shape(Default::default())),
+                                6 => _content = Some(LayerContent::MediaRef(Default::default())),
+                                _ => de_unreachable(s),
+                            },
+                            _ => de_unreachable(s),
                         }
-                        // _content = Some(DeJson::de_json(s, i)?);
+                        s.next_tok(i)?;
                     }
-                    "a" | "d" | "m" => {
-                        s.next_colon(i)?;
-                        // assert!(matches!(
-                        //     _content,
-                        //     None | Some(LayerContent::Text(_))
-                        // ));
-                        println!("sub de_json for Text(TextAnimationData)");
-                        // _content = Some(DeJson::de_json(s, i)?);
-                    }
-                    "p" => {
-                        s.next_colon(i)?;
-                        println!("sub de_json for Text(TextAnimationData)");
-                        println!("sub de_json for Media");
-                        // _content = Some(DeJson::de_json(s, i)?);
-                    }
-                    "u" | "e" => {
+                    "u" => {
                         s.next_colon(i)?;
                         assert!(matches!(_content, None | Some(LayerContent::Media(_))));
                         println!("sub de_json for Media");
                         // _content = Some(DeJson::de_json(s, i)?);
                     }
-                    "nm" => {
-                        s.next_colon(i)?;
-                        assert!(matches!(_content, None | Some(LayerContent::Media(_))));
-                        println!("sub de_json for Media");
-                        _name = Some(DeJson::de_json(s, i)?);
-                    }
-                    "sc" | "sh" | "sw" => {
+                    "w" => {
                         s.next_colon(i)?;
                         assert!(matches!(
                             _content,
-                            None | Some(LayerContent::SolidColor { .. })
+                            None | Some(LayerContent::PreCompositionRef(_))
+                                | Some(LayerContent::MediaRef(_))
                         ));
-                        println!("sub de_json for SolidColor");
-                        // _content = Some(DeJson::de_json(s, i)?);
+                        println!("sub de_json for PreCompositionRef");
+                        println!("sub de_json for Media");
+                        match _content.as_mut() {
+                            Some(LayerContent::PreCompositionRef(PreCompositionRef {
+                                ref mut width,
+                                ..
+                            })) => {
+                                *width = DeJson::de_json(s, i)?;
+                            }
+                            _ => de_unreachable(s),
+                        }
                     }
-                    _ => {
-                        s.next_colon(i)?;
-                        s.whole_field(i)?;
-                    }
+                    _ => de_unreachable(s),
                 }
                 s.eat_comma_curly(i)?
             }
@@ -711,6 +1285,41 @@ impl DeJson for Layer {
                         return Err(s.err_nf("end_frame"));
                     }
                 },
+                time_stretch: {
+                    if let Some(t) = _time_stretch {
+                        t
+                    } else {
+                        None
+                    }
+                },
+                matte_mode: {
+                    if let Some(t) = _matte_mode {
+                        t
+                    } else {
+                        None
+                    }
+                },
+                blend_mode: {
+                    if let Some(t) = _blend_mode {
+                        t
+                    } else {
+                        None
+                    }
+                },
+                has_mask: {
+                    if let Some(t) = _has_mask {
+                        t
+                    } else {
+                        Default::default()
+                    }
+                },
+                masks_properties: {
+                    if let Some(t) = _masks_properties {
+                        t
+                    } else {
+                        Default::default()
+                    }
+                },
                 start_time: {
                     if let Some(t) = _start_time {
                         t
@@ -720,6 +1329,13 @@ impl DeJson for Layer {
                 },
                 name: {
                     if let Some(t) = _name {
+                        t
+                    } else {
+                        None
+                    }
+                },
+                match_name: {
+                    if let Some(t) = _match_name {
                         t
                     } else {
                         None
@@ -844,8 +1460,55 @@ impl SerJson for Layer {
                 s.field(d + 1, "shapes");
                 shape_group.shapes.ser_json(d + 1, s);
             }
+            LayerContent::PreCompositionRef(pre_composition_ref) => {
+                i32::ser_json(&0, d + 1, s);
+                s.conl();
+                s.field(d + 1, "refId");
+                pre_composition_ref.ref_id.ser_json(d + 1, s);
+                s.conl();
+                s.field(d + 1, "w");
+                pre_composition_ref.width.ser_json(d + 1, s);
+                s.conl();
+                s.field(d + 1, "h");
+                pre_composition_ref.height.ser_json(d + 1, s);
+                s.conl();
+                s.field(d + 1, "tm");
+                pre_composition_ref.time_remapping.ser_json(d + 1, s);
+            }
             _ => unreachable!(),
         }
+        if first_field_was_serialized {
+            s.conl();
+        }
+        first_field_was_serialized = true;
+        s.field(d + 1, "tt");
+        if let Some(t) = &self.matte_mode {
+            t.ser_json(d + 1, s);
+        } else {
+            Option::<i32>::ser_json(&None, d + 1, s);
+        };
+        if first_field_was_serialized {
+            s.conl();
+        }
+        first_field_was_serialized = true;
+        s.field(d + 1, "bm");
+        if let Some(t) = &self.blend_mode {
+            t.ser_json(d + 1, s);
+        } else {
+            Option::<i32>::ser_json(&None, d + 1, s);
+        };
+        if first_field_was_serialized {
+            s.conl();
+        }
+        first_field_was_serialized = true;
+        s.field(d + 1, "hasMask");
+        self.has_mask.ser_json(d + 1, s);
+        if first_field_was_serialized {
+            s.conl();
+        }
+        first_field_was_serialized = true;
+        s.field(d + 1, "masksProperties");
+        self.masks_properties.ser_json(d + 1, s);
         s.st_post(d);
     }
 }
@@ -911,13 +1574,13 @@ impl Default for Rgba {
     }
 }
 
-#[derive(SerJson, DeJson, Debug, Clone)]
+#[derive(SerJson, DeJson, Debug, Clone, Default)]
 pub struct MediaRef {
     #[nserde(rename = "refId")]
     pub ref_id: String,
 }
 
-#[derive(SerJson, DeJson, Debug, Clone)]
+#[derive(SerJson, DeJson, Debug, Clone, Default)]
 pub struct ShapeGroup {
     pub shapes: Vec<ShapeLayer>,
 }
@@ -956,7 +1619,21 @@ impl SerJson for ShapeLayer {
         s.field(d + 1, "ty");
         dbg!(&self.shape);
         match &self.shape {
-            Shape::Rectangle(_) => String::ser_json(&"rc".into(), d + 1, s),
+            Shape::Rectangle(rectangle) => {
+                String::ser_json(&"rc".into(), d + 1, s);
+                s.conl();
+                s.field(d + 1, "d");
+                rectangle.direction.ser_json(d + 1, s);
+                s.conl();
+                s.field(d + 1, "p");
+                rectangle.position.ser_json(d + 1, s);
+                s.conl();
+                s.field(d + 1, "s");
+                rectangle.size.ser_json(d + 1, s);
+                s.conl();
+                s.field(d + 1, "r");
+                rectangle.radius.ser_json(d + 1, s);
+            }
             Shape::Ellipse(ellipse) => {
                 String::ser_json(&"el".into(), d + 1, s);
                 s.conl();
@@ -1053,12 +1730,9 @@ fn de_unreachable(s: &mut DeJsonState) {
 
 impl DeJson for ShapeLayer {
     #[allow(clippy::ignored_unit_patterns)]
-    fn de_json(
-        s: &mut DeJsonState,
-        i: &mut core::str::Chars,
-    ) -> ::core::result::Result<Self, DeJsonErr> {
+    fn de_json(s: &mut DeJsonState, i: &mut Chars) -> Result<Self, DeJsonErr> {
         println!("de_json for ShapeLayer");
-        ::core::result::Result::Ok({
+        Ok({
             let mut _name = None;
             let mut _hidden = None;
             let mut _shape = None;
@@ -1156,14 +1830,28 @@ impl DeJson for ShapeLayer {
                                 }
                                 "sh" => {
                                     println!("sub de_json for Path");
-                                    match _shape.as_ref() {
+                                    match _shape.as_mut() {
                                         None => {
-                                            _shape = Some(Shape::Path {
+                                            let path = Shape::Path {
                                                 data: Default::default(),
+                                                direction: if let Some(direction) = _direction {
+                                                    _direction = None;
+                                                    direction
+                                                } else {
+                                                    Default::default()
+                                                },
                                                 text_range: Default::default(),
-                                            });
+                                            };
+                                            _shape = Some(path);
                                         }
-                                        Some(Shape::Path { .. }) => (),
+                                        Some(Shape::Path {
+                                            ref mut direction, ..
+                                        }) => {
+                                            if let Some(saved_direction) = _direction {
+                                                *direction = saved_direction;
+                                                _direction = None;
+                                            }
+                                        }
                                         _ => de_unreachable(s),
                                     }
                                 }
@@ -1184,6 +1872,17 @@ impl DeJson for ShapeLayer {
                                                 _dashes = None;
                                             }
                                         }
+                                        _ => de_unreachable(s),
+                                    }
+                                }
+                                "gf" => {
+                                    println!("sub de_json for GradientFill");
+                                    match _shape.as_mut() {
+                                        None => {
+                                            _shape =
+                                                Some(Shape::GradientFill(GradientFill::default()));
+                                        }
+                                        Some(Shape::GradientFill(_)) => (),
                                         _ => de_unreachable(s),
                                     }
                                 }
@@ -1246,6 +1945,7 @@ impl DeJson for ShapeLayer {
                         println!("sub de_json for Rectangle");
                         println!("sub de_json for Ellipse");
                         println!("sub de_json for Stroke");
+                        println!("sub de_json for Path");
 
                         dbg!(&_shape);
                         match _shape.as_mut() {
@@ -1267,6 +1967,11 @@ impl DeJson for ShapeLayer {
                             Some(Shape::Ellipse(ellipse)) => {
                                 ellipse.direction = DeJson::de_json(s, i)?;
                             }
+                            Some(Shape::Path {
+                                ref mut direction, ..
+                            }) => {
+                                *direction = DeJson::de_json(s, i)?;
+                            }
                             Some(Shape::Stroke(stroke)) => {
                                 if let Some(dashes) = _dashes {
                                     stroke.dashes = dashes;
@@ -1277,11 +1982,41 @@ impl DeJson for ShapeLayer {
                             _ => de_unreachable(s),
                         }
                     }
+                    "e" => {
+                        s.next_colon(i)?;
+                        println!("sub de_json for GradientFill->gradient");
+                        match _shape.as_mut() {
+                            Some(Shape::GradientFill(gradient_fill)) => {
+                                gradient_fill.gradient.end = DeJson::de_json(s, i)?;
+                            }
+                            _ => de_unreachable(s),
+                        }
+                    }
+                    "g" => {
+                        s.next_colon(i)?;
+                        println!("sub de_json for GradientFill->gradient");
+                        match _shape.as_mut() {
+                            Some(Shape::GradientFill(gradient_fill)) => {
+                                let colors = DeJson::de_json(s, i)?;
+                                gradient_fill.gradient.colors =
+                                    From::<&ColorListHelper>::from(&colors);
+                            }
+                            _ => de_unreachable(s),
+                        }
+                    }
                     "ks" => {
                         s.next_colon(i)?;
                         println!("sub de_json for Path");
                         match _shape.as_mut() {
-                            Some(Shape::Path { ref mut data, .. }) => {
+                            Some(Shape::Path {
+                                ref mut data,
+                                ref mut direction,
+                                ..
+                            }) => {
+                                if let Some(saved_direction) = _direction {
+                                    *direction = saved_direction;
+                                    _direction = None;
+                                }
                                 *data = DeJson::de_json(s, i)?;
                             }
                             _ => de_unreachable(s),
@@ -1334,12 +2069,16 @@ impl DeJson for ShapeLayer {
                     }
                     "o" => {
                         s.next_colon(i)?;
+                        println!("sub de_json for GradientFill");
                         println!("sub de_json for Repeater");
                         println!("sub de_json for Fill");
                         println!("sub de_json for Transform");
                         println!("sub de_json for Stroke");
                         dbg!(&_shape);
                         match _shape.as_mut() {
+                            Some(Shape::GradientFill(gradient_fill)) => {
+                                gradient_fill.opacity = DeJson::de_json(s, i)?;
+                            }
                             Some(Shape::Fill(fill)) => {
                                 fill.opacity = DeJson::de_json(s, i)?;
                             }
@@ -1389,6 +2128,7 @@ impl DeJson for ShapeLayer {
                         println!("sub de_json for Rectangle");
                         println!("sub de_json for Fill");
                         println!("sub de_json for Transform");
+                        println!("sub de_json for GradientFill");
                         match _shape.as_mut() {
                             Some(Shape::Fill(fill)) => {
                                 fill.fill_rule = DeJson::de_json(s, i)?;
@@ -1406,6 +2146,9 @@ impl DeJson for ShapeLayer {
                             Some(Shape::RoundedCorners { radius }) => {
                                 *radius = DeJson::de_json(s, i)?;
                             }
+                            Some(Shape::GradientFill(gradient_fill)) => {
+                                gradient_fill.fill_rule = DeJson::de_json(s, i)?;
+                            }
                             _ => de_unreachable(s),
                         }
                     }
@@ -1415,6 +2158,7 @@ impl DeJson for ShapeLayer {
                         println!("sub de_json for Rectangle");
                         println!("sub de_json for Ellipse");
                         println!("sub de_json for Transform");
+                        println!("sub de_json for GradientFill->gradient");
                         match _shape.as_mut() {
                             Some(Shape::Rectangle(rectangle)) => {
                                 if let Some(direction) = _direction {
@@ -1432,6 +2176,9 @@ impl DeJson for ShapeLayer {
                             }
                             Some(Shape::Transform(transform)) => {
                                 transform.scale = DeJson::de_json(s, i)?;
+                            }
+                            Some(Shape::GradientFill(gradient_fill)) => {
+                                gradient_fill.gradient.start = DeJson::de_json(s, i)?;
                             }
                             _ => de_unreachable(s),
                         }
@@ -1452,6 +2199,16 @@ impl DeJson for ShapeLayer {
                         match _shape.as_mut() {
                             Some(Shape::Transform(transform)) => {
                                 transform.skew_axis = DeJson::de_json(s, i)?;
+                            }
+                            _ => de_unreachable(s),
+                        }
+                    }
+                    "t" => {
+                        s.next_colon(i)?;
+                        println!("sub de_json for GradientFill->gradient");
+                        match _shape.as_mut() {
+                            Some(Shape::GradientFill(gradient_fill)) => {
+                                gradient_fill.gradient.gradient_ty = DeJson::de_json(s, i)?;
                             }
                             _ => de_unreachable(s),
                         }
@@ -1519,6 +2276,8 @@ pub enum Shape {
     Path {
         #[nserde(rename = "ks")]
         data: Animated<Vec<Bezier>>,
+        #[nserde(rename = "d", default)]
+        direction: ShapeDirection,
         #[nserde(skip)]
         text_range: Option<TextRangeInfo>,
     },
@@ -1526,8 +2285,8 @@ pub enum Shape {
     Fill(Fill),
     #[nserde(rename = "st")]
     Stroke(Stroke),
-    // #[nserde(rename = "gf")]
-    // GradientFill(GradientFill),
+    #[nserde(rename = "gf")]
+    GradientFill(GradientFill),
     // #[nserde(rename = "gs")]
     // GradientStroke(GradientStroke),
     #[nserde(rename = "gr")]
@@ -1607,23 +2366,11 @@ impl Default for Shape {
 pub struct Bezier {
     #[nserde(rename = "c", default)]
     pub closed: bool,
-    #[nserde(
-        rename = "v",
-        deserialize_with = "vec_from_array",
-        serialize_with = "array_from_vec"
-    )]
+    #[nserde(rename = "v")]
     pub verticies: Vec<Vector2D>,
-    #[nserde(
-        rename = "i",
-        deserialize_with = "vec_from_array",
-        serialize_with = "array_from_vec"
-    )]
+    #[nserde(rename = "i")]
     pub in_tangent: Vec<Vector2D>,
-    #[nserde(
-        rename = "o",
-        deserialize_with = "vec_from_array",
-        serialize_with = "array_from_vec"
-    )]
+    #[nserde(rename = "o")]
     pub out_tangent: Vec<Vector2D>,
 }
 
@@ -1638,6 +2385,20 @@ impl FromTo<Value> for Vec<Bezier> {
 
     fn to(self) -> Value {
         Value::ComplexBezier(self)
+    }
+}
+
+impl FromTo<Value> for Vec<f32> {
+    fn from(v: Value) -> Self {
+        match v {
+            Value::Primitive(f) => vec![f],
+            Value::List(l) => l,
+            _ => todo!(),
+        }
+    }
+
+    fn to(self) -> Value {
+        Value::List(self)
     }
 }
 
@@ -2065,6 +2826,185 @@ pub enum StrokeDashType {
     Offset,
 }
 
+#[derive(SerJson, DeJson, Debug, Clone, Default)]
+pub struct GradientFill {
+    #[nserde(rename = "o")]
+    pub opacity: Animated<f32>,
+    #[nserde(rename = "r")]
+    pub fill_rule: FillRule,
+    #[nserde(flatten)]
+    pub gradient: Gradient,
+}
+
+#[derive(SerJson, DeJson, Debug, Clone, Default)]
+pub struct Gradient {
+    #[nserde(rename = "s")]
+    pub start: Animated<Vector2D>,
+    #[nserde(rename = "e")]
+    pub end: Animated<Vector2D>,
+    #[nserde(rename = "t")]
+    pub gradient_ty: GradientType,
+    #[nserde(rename = "g", proxy = "ColorListHelper")]
+    pub colors: ColorList,
+}
+
+#[derive(Debug, Clone, Copy, Default)]
+#[repr(u8)]
+pub enum GradientType {
+    #[default]
+    Linear = 1,
+    Radial = 2,
+}
+
+impl DeJson for GradientType {
+    fn de_json(s: &mut DeJsonState, i: &mut std::str::Chars) -> Result<Self, DeJsonErr> {
+        println!("de_json for GradientType");
+
+        match s.tok {
+            DeJsonTok::U64(_) => {
+                let r = s.as_f64()? as u8;
+                s.next_tok(i)?;
+                match r {
+                    1 => Ok(Self::Linear),
+                    2 => Ok(Self::Radial),
+                    _ => Err(s.err_range("1..2")),
+                }
+            }
+            _ => Err(s.err_token("F64")),
+        }
+    }
+}
+
+impl SerJson for GradientType {
+    fn ser_json(&self, d: usize, s: &mut SerJsonState) {
+        match self {
+            Self::Linear => 1.ser_json(d, s),
+            Self::Radial => 2.ser_json(d, s),
+        }
+    }
+}
+
+#[derive(SerJson, DeJson, Debug, Clone, Default)]
+pub struct ColorList {
+    color_count: usize,
+    pub colors: Animated<Vec<GradientColor>>,
+}
+
+#[derive(SerJson, DeJson, Debug, Clone)]
+pub struct GradientColor {
+    pub offset: f32,
+    pub color: Rgba,
+}
+
+impl FromTo<Value> for Vec<GradientColor> {
+    fn from(v: Value) -> Self {
+        todo!()
+    }
+
+    fn to(self) -> Value {
+        todo!()
+    }
+}
+
+#[derive(SerJson, DeJson)]
+struct ColorListHelper {
+    #[nserde(rename = "p")]
+    color_count: usize,
+    #[nserde(rename = "k")]
+    colors: Animated<Vec<f32>>,
+}
+
+impl From<&ColorListHelper> for ColorList {
+    fn from(helper: &ColorListHelper) -> Self {
+        let color_count = helper.color_count;
+        ColorList {
+            color_count,
+            colors: Animated {
+                animated: helper.colors.animated,
+                keyframes: helper
+                    .colors
+                    .keyframes
+                    .clone()
+                    .into_iter()
+                    .map(|keyframe| {
+                        let start = f32_to_gradient_colors(&keyframe.start_value, color_count);
+                        let end = f32_to_gradient_colors(&keyframe.end_value, color_count);
+                        keyframe.alter_value(start, end)
+                    })
+                    .collect(),
+            },
+        }
+    }
+}
+
+fn f32_to_gradient_colors(data: &Vec<f32>, color_count: usize) -> Vec<GradientColor> {
+    if data.len() == color_count * 4 {
+        // Rgb color
+        data.chunks(4)
+            .map(|chunk| GradientColor {
+                offset: chunk[0],
+                color: Rgba::new_f32(chunk[1], chunk[2], chunk[3], 1.0),
+            })
+            .collect()
+    } else if data.len() == color_count * 4 + color_count * 2 {
+        // Rgba color
+        (&data[0..(color_count * 4)])
+            .chunks(4)
+            .zip((&data[(color_count * 4)..]).chunks(2))
+            .map(|(chunk, opacity)| GradientColor {
+                offset: chunk[0],
+                color: Rgba::new_f32(chunk[1], chunk[2], chunk[3], opacity[1]),
+            })
+            .collect()
+    } else {
+        unimplemented!()
+    }
+}
+
+impl From<&ColorList> for ColorListHelper {
+    fn from(list: &ColorList) -> Self {
+        ColorListHelper {
+            color_count: list.color_count,
+            colors: Animated {
+                animated: list.colors.animated,
+                keyframes: list
+                    .colors
+                    .keyframes
+                    .clone()
+                    .into_iter()
+                    .map(|keyframe| {
+                        let start = gradient_colors_to_f32(&keyframe.start_value);
+                        let end = gradient_colors_to_f32(&keyframe.end_value);
+                        keyframe.alter_value(start, end)
+                    })
+                    .collect(),
+            },
+        }
+    }
+}
+
+fn gradient_colors_to_f32(data: &Vec<GradientColor>) -> Vec<f32> {
+    let mut start = data
+        .iter()
+        .flat_map(|color| {
+            vec![
+                color.offset,
+                color.color.r as f32 / 255.0,
+                color.color.g as f32 / 255.0,
+                color.color.b as f32 / 255.0,
+            ]
+        })
+        .collect::<Vec<_>>();
+    let start_has_opacity = data.iter().any(|color| color.color.a < 255);
+    if start_has_opacity {
+        start.extend(
+            data.iter()
+                .flat_map(|color| vec![color.offset, color.color.a as f32 / 255.0]),
+        );
+    }
+    start
+}
+
 // #[derive(SerJson, DeJson, Debug, Clone)]
 // pub struct TextAnimationData {
 //     #[nserde(rename = "a")]
@@ -2077,7 +3017,7 @@ pub enum StrokeDashType {
 //     follow_path: TextFollowPath,
 // }
 
-#[derive(SerJson, DeJson, Debug, Clone)]
+#[derive(SerJson, DeJson, Debug, Clone, Default)]
 pub struct Media {
     #[nserde(rename = "u", default)]
     pub pwd: String,
@@ -2088,6 +3028,8 @@ pub struct Media {
     id: String,
     #[nserde(rename = "nm", default)]
     name: Option<String>,
+    #[nserde(rename = "mn", default, skip)]
+    match_name: Option<String>,
     #[nserde(rename = "w", default)]
     pub width: Option<u32>,
     #[nserde(rename = "h", default)]
@@ -2176,7 +3118,7 @@ pub struct LegacyKeyFrame<T> {
 }
 
 impl DeJson for KeyFramesFromArray {
-    fn de_json(s: &mut DeJsonState, i: &mut core::str::Chars) -> Result<Self, DeJsonErr> {
+    fn de_json(s: &mut DeJsonState, i: &mut Chars) -> Result<Self, DeJsonErr> {
         println!("de_json for KeyFramesFromArray");
         dbg!(&s.tok);
         match s.tok {
@@ -2471,6 +3413,17 @@ impl<T: Clone + Default + Debug> KeyFrame<T> {
             easing_in: None,
         }
     }
+
+    pub fn alter_value<U: Default + Debug>(&self, start: U, end: U) -> KeyFrame<U> {
+        KeyFrame {
+            start_value: start,
+            end_value: end,
+            start_frame: self.start_frame,
+            end_frame: self.end_frame,
+            easing_out: self.easing_out.clone(),
+            easing_in: self.easing_in.clone(),
+        }
+    }
 }
 
 #[derive(PartialEq, Debug, SerJson)]
@@ -2481,7 +3434,7 @@ enum ArrayFromArrayOfNumber {
 }
 
 impl DeJson for ArrayFromArrayOfNumber {
-    fn de_json(s: &mut DeJsonState, i: &mut core::str::Chars) -> Result<Self, DeJsonErr> {
+    fn de_json(s: &mut DeJsonState, i: &mut Chars) -> Result<Self, DeJsonErr> {
         println!("de_json for ArrayFromArrayOfNumber");
         dbg!((s.cur, s.line, s.col));
         dbg!(&s.tok);

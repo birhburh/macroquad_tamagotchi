@@ -7,10 +7,13 @@ use {
 };
 
 fn main() {
-    // let data = fs::read_to_string("pylottie_circle.json").expect("Unable to read file");
-    // let data = fs::read_to_string("../lottie-rs/fixtures/ui/bouncy_ball.json").expect("Unable to read file");
-    let data = fs::read_to_string("../lottie-rs/fixtures/ui/7148-the-nyan-cat.json")
-        .expect("Unable to read file");
+    // let path = "assets/glaxnimate_triangle.json";
+    let path = "assets/glaxnimate_rectangles.json";
+    // let path = "pylottie_circle.json";
+    // let path = "../lottie-rs/fixtures/ui/bouncy_ball.json";
+    // let path = "../lottie-rs/fixtures/ui/7148-the-nyan-cat.json";
+    // let path = "../lottie-rs/fixtures/ui/delete.json";
+    let data = fs::read_to_string(path).expect("Unable to read file");
     let s_model: lottie::Model =
         serde_json::from_str(&data).expect("serde cannot deserialize model");
     // dbg!(&s_model);

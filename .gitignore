@@ -10,4 +10,4 @@ assets/*.gif
 /target
 
 # ignore all lottie examples that I downloaded from lottie-rs without proper credit
-*.json
+/*.json
