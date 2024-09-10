@@ -1696,7 +1696,8 @@ impl SerJson for ShapeLayer {
                 gradient_fill.gradient.gradient_ty.ser_json(d + 1, s);
                 s.conl();
                 s.field(d + 1, "g");
-                gradient_fill.gradient.colors.ser_json(d + 1, s);
+                let colors: ColorListHelper = Into::into(&gradient_fill.gradient.colors);
+                colors.ser_json(d + 1, s);
             }
             _ => unreachable!(),
         }
