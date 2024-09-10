@@ -1677,6 +1677,27 @@ impl SerJson for ShapeLayer {
                 s.field(d + 1, "c");
                 stroke.color.ser_json(d + 1, s);
             }
+            Shape::GradientFill(gradient_fill) => {
+                String::ser_json(&"gf".into(), d + 1, s);
+                s.conl();
+                s.field(d + 1, "o");
+                gradient_fill.opacity.ser_json(d + 1, s);
+                s.conl();
+                s.field(d + 1, "r");
+                gradient_fill.fill_rule.ser_json(d + 1, s);
+                s.conl();
+                s.field(d + 1, "s");
+                gradient_fill.gradient.start.ser_json(d + 1, s);
+                s.conl();
+                s.field(d + 1, "e");
+                gradient_fill.gradient.end.ser_json(d + 1, s);
+                s.conl();
+                s.field(d + 1, "t");
+                gradient_fill.gradient.gradient_ty.ser_json(d + 1, s);
+                s.conl();
+                s.field(d + 1, "g");
+                gradient_fill.gradient.colors.ser_json(d + 1, s);
+            }
             _ => unreachable!(),
         }
         s.st_post(d);
@@ -1859,6 +1880,9 @@ impl DeJson for ShapeLayer {
                             Some(Shape::Transform(transform)) => {
                                 transform.anchor = DeJson::de_json(s, i)?;
                             }
+                            Some(Shape::GradientFill(gradient_fill)) => {
+                                gradient_fill.highlight_angle = DeJson::de_json(s, i)?;
+                            }
                             _ => de_unreachable(s),
                         }
                     }
@@ -1931,6 +1955,15 @@ impl DeJson for ShapeLayer {
                                 let colors = DeJson::de_json(s, i)?;
                                 gradient_fill.gradient.colors =
                                     From::<&ColorListHelper>::from(&colors);
+                            }
+                            _ => de_unreachable(s),
+                        }
+                    }
+                    "h" => {
+                        s.next_colon(i)?;
+                        match _shape.as_mut() {
+                            Some(Shape::GradientFill(gradient_fill)) => {
+                                gradient_fill.highlight_length = DeJson::de_json(s, i)?;
                             }
                             _ => de_unreachable(s),
                         }
@@ -2162,39 +2195,26 @@ impl DeJson for ShapeLayer {
     }
 }
 
-#[derive(SerJson, DeJson, Debug, Clone)]
-#[nserde(tag = "ty")]
+#[derive(Debug, Clone)]
 pub enum Shape {
-    #[nserde(rename = "rc")]
     Rectangle(Rectangle),
-    #[nserde(rename = "el")]
     Ellipse(Ellipse),
     // #[nserde(rename = "sr")]
     // PolyStar(PolyStar),
-    #[nserde(rename = "sh")]
     Path {
-        #[nserde(rename = "ks")]
         data: Animated<Vec<Bezier>>,
-        #[nserde(rename = "d", default)]
         direction: ShapeDirection,
-        #[nserde(skip)]
         text_range: Option<TextRangeInfo>,
     },
-    #[nserde(rename = "fl")]
     Fill(Fill),
-    #[nserde(rename = "st")]
     Stroke(Stroke),
-    #[nserde(rename = "gf")]
     GradientFill(GradientFill),
     // #[nserde(rename = "gs")]
     // GradientStroke(GradientStroke),
-    #[nserde(rename = "gr")]
     Group {
         // TODO: add np property
-        #[nserde(rename = "it")]
         shapes: Vec<ShapeLayer>,
     },
-    #[nserde(rename = "tr")]
     Transform(Transform),
     // #[nserde(rename = "rp")]
     // Repeater {
@@ -2209,21 +2229,14 @@ pub enum Shape {
     // },
     // #[nserde(rename = "tm")]
     // Trim(Trim),
-    #[nserde(rename = "rd")]
     RoundedCorners {
-        #[nserde(rename = "r")]
         radius: Animated<f32>,
     },
-    #[nserde(rename = "pb")]
     PuckerBloat {
-        #[nserde(rename = "a")]
         amount: Animated<f32>,
     },
-    #[nserde(rename = "tw")]
     Twist {
-        #[nserde(rename = "a")]
         angle: Animated<f32>,
-        #[nserde(rename = "c")]
         center: Animated<Vector2D>,
     },
     // #[nserde(rename = "mm")]
@@ -2719,25 +2732,20 @@ pub enum StrokeDashType {
     Offset,
 }
 
-#[derive(SerJson, DeJson, Debug, Clone, Default)]
+#[derive(Debug, Clone, Default)]
 pub struct GradientFill {
-    #[nserde(rename = "o")]
     pub opacity: Animated<f32>,
-    #[nserde(rename = "r")]
     pub fill_rule: FillRule,
-    #[nserde(flatten)]
     pub gradient: Gradient,
+    pub highlight_angle: Animated<f32>,
+    pub highlight_length: Animated<f32>,
 }
 
-#[derive(SerJson, DeJson, Debug, Clone, Default)]
+#[derive(Debug, Clone, Default)]
 pub struct Gradient {
-    #[nserde(rename = "s")]
     pub start: Animated<Vector2D>,
-    #[nserde(rename = "e")]
     pub end: Animated<Vector2D>,
-    #[nserde(rename = "t")]
     pub gradient_ty: GradientType,
-    #[nserde(rename = "g", proxy = "ColorListHelper")]
     pub colors: ColorList,
 }
 
@@ -2747,6 +2755,7 @@ pub enum GradientType {
     #[default]
     Linear = 1,
     Radial = 2,
+    Conical = 3, // only in glaxnimate
 }
 
 impl DeJson for GradientType {
@@ -2759,7 +2768,8 @@ impl DeJson for GradientType {
                 match r {
                     1 => Ok(Self::Linear),
                     2 => Ok(Self::Radial),
-                    _ => Err(s.err_range("1..2")),
+                    3 => Ok(Self::Conical),
+                    _ => Err(s.err_range("1..3")),
                 }
             }
             _ => Err(s.err_token("F64")),
@@ -2772,6 +2782,7 @@ impl SerJson for GradientType {
         match self {
             Self::Linear => 1.ser_json(d, s),
             Self::Radial => 2.ser_json(d, s),
+            Self::Conical => 3.ser_json(d, s),
         }
     }
 }
