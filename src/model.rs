@@ -183,7 +183,6 @@ impl Default for TextJustify {
 
 impl DeJson for TextJustify {
     fn de_json(s: &mut DeJsonState, i: &mut std::str::Chars) -> Result<Self, DeJsonErr> {
-
         match s.tok {
             DeJsonTok::U64(_) => {
                 let r = s.as_f64()? as u8;
@@ -234,7 +233,6 @@ impl Default for TextCaps {
 
 impl DeJson for TextCaps {
     fn de_json(s: &mut DeJsonState, i: &mut std::str::Chars) -> Result<Self, DeJsonErr> {
-
         match s.tok {
             DeJsonTok::U64(_) => {
                 let r = s.as_f64()? as u8;
@@ -284,7 +282,7 @@ mod vector_2_d {
     };
 
     #[derive(PartialEq, Debug, Default, Clone)]
-    pub struct Vector2D<T>(euclid::default::Vector2D<T>);
+    pub struct Vector2D<T>(pub euclid::default::Vector2D<T>);
 
     impl<T> Vector2D<T> {
         pub const fn new(x: T, y: T) -> Self {
@@ -711,7 +709,6 @@ pub enum FontPathOrigin {
 
 impl DeJson for FontPathOrigin {
     fn de_json(s: &mut DeJsonState, i: &mut std::str::Chars) -> Result<Self, DeJsonErr> {
-
         match s.tok {
             DeJsonTok::U64(_) => {
                 let r = s.as_f64()? as u8;
@@ -794,7 +791,6 @@ pub enum MatteMode {
 
 impl DeJson for MatteMode {
     fn de_json(s: &mut DeJsonState, i: &mut std::str::Chars) -> Result<Self, DeJsonErr> {
-
         match s.tok {
             DeJsonTok::U64(_) => {
                 let r = s.as_f64()? as u8;
@@ -850,7 +846,6 @@ pub enum BlendMode {
 
 impl DeJson for BlendMode {
     fn de_json(s: &mut DeJsonState, i: &mut std::str::Chars) -> Result<Self, DeJsonErr> {
-
         match s.tok {
             DeJsonTok::U64(_) => {
                 let r = s.as_f64()? as u8;
@@ -1733,128 +1728,111 @@ impl DeJson for ShapeLayer {
                         s.next_colon(i)?;
                         if let Some(_) = s.next_str() {
                             match AsRef::<str>::as_ref(&s.strbuf) {
-                                "rc" => {
-                                    match _shape.as_mut() {
-                                        None => {
-                                            let mut rect = Rectangle::default();
-                                            if let Some(direction) = _direction {
-                                                rect.direction = direction;
+                                "rc" => match _shape.as_mut() {
+                                    None => {
+                                        let mut rect = Rectangle::default();
+                                        if let Some(direction) = _direction {
+                                            rect.direction = direction;
+                                            _direction = None;
+                                        }
+                                        _shape = Some(Shape::Rectangle(rect));
+                                    }
+                                    Some(Shape::Rectangle(rect)) => {
+                                        if let Some(direction) = _direction {
+                                            rect.direction = direction;
+                                            _direction = None;
+                                        }
+                                    }
+                                    _ => return Err(s.err_nf("start_time")),
+                                },
+                                "el" => match _shape.as_mut() {
+                                    None => {
+                                        let mut ellipse = Ellipse::default();
+                                        if let Some(direction) = _direction {
+                                            ellipse.direction = direction;
+                                            _direction = None;
+                                        }
+                                        _shape = Some(Shape::Ellipse(ellipse));
+                                    }
+                                    Some(Shape::Ellipse(ellipse)) => {
+                                        if let Some(direction) = _direction {
+                                            ellipse.direction = direction;
+                                            _direction = None;
+                                        }
+                                    }
+                                    _ => de_unreachable(s),
+                                },
+                                "gr" => match _shape.as_ref() {
+                                    None => {
+                                        _shape = Some(Shape::Group {
+                                            shapes: Default::default(),
+                                        });
+                                    }
+                                    Some(Shape::Group { .. }) => (),
+                                    _ => de_unreachable(s),
+                                },
+                                "fl" => match _shape.as_ref() {
+                                    None => {
+                                        _shape = Some(Shape::Fill(Default::default()));
+                                    }
+                                    Some(Shape::Fill { .. }) => (),
+                                    _ => de_unreachable(s),
+                                },
+                                "tr" => match _shape.as_ref() {
+                                    None => {
+                                        _shape = Some(Shape::Transform(Default::default()));
+                                    }
+                                    Some(Shape::Transform { .. }) => (),
+                                    _ => de_unreachable(s),
+                                },
+                                "sh" => match _shape.as_mut() {
+                                    None => {
+                                        let path = Shape::Path {
+                                            data: Default::default(),
+                                            direction: if let Some(direction) = _direction {
                                                 _direction = None;
-                                            }
-                                            _shape = Some(Shape::Rectangle(rect));
-                                        }
-                                        Some(Shape::Rectangle(rect)) => {
-                                            if let Some(direction) = _direction {
-                                                rect.direction = direction;
-                                                _direction = None;
-                                            }
-                                        }
-                                        _ => return Err(s.err_nf("start_time")),
+                                                direction
+                                            } else {
+                                                Default::default()
+                                            },
+                                            text_range: Default::default(),
+                                        };
+                                        _shape = Some(path);
                                     }
-                                }
-                                "el" => {
-                                    match _shape.as_mut() {
-                                        None => {
-                                            let mut ellipse = Ellipse::default();
-                                            if let Some(direction) = _direction {
-                                                ellipse.direction = direction;
-                                                _direction = None;
-                                            }
-                                            _shape = Some(Shape::Ellipse(ellipse));
+                                    Some(Shape::Path {
+                                        ref mut direction, ..
+                                    }) => {
+                                        if let Some(saved_direction) = _direction {
+                                            *direction = saved_direction;
+                                            _direction = None;
                                         }
-                                        Some(Shape::Ellipse(ellipse)) => {
-                                            if let Some(direction) = _direction {
-                                                ellipse.direction = direction;
-                                                _direction = None;
-                                            }
-                                        }
-                                        _ => de_unreachable(s),
                                     }
-                                }
-                                "gr" => {
-                                    match _shape.as_ref() {
-                                        None => {
-                                            _shape = Some(Shape::Group {
-                                                shapes: Default::default(),
-                                            });
+                                    _ => de_unreachable(s),
+                                },
+                                "st" => match _shape.as_mut() {
+                                    None => {
+                                        let mut stroke = Stroke::default();
+                                        if let Some(dashes) = _dashes {
+                                            stroke.dashes = dashes;
+                                            _dashes = None;
                                         }
-                                        Some(Shape::Group { .. }) => (),
-                                        _ => de_unreachable(s),
+                                        _shape = Some(Shape::Stroke(stroke));
                                     }
-                                }
-                                "fl" => {
-                                    match _shape.as_ref() {
-                                        None => {
-                                            _shape = Some(Shape::Fill(Default::default()));
+                                    Some(Shape::Stroke(stroke)) => {
+                                        if let Some(dashes) = _dashes {
+                                            stroke.dashes = dashes;
+                                            _dashes = None;
                                         }
-                                        Some(Shape::Fill { .. }) => (),
-                                        _ => de_unreachable(s),
                                     }
-                                }
-                                "tr" => {
-                                    match _shape.as_ref() {
-                                        None => {
-                                            _shape = Some(Shape::Transform(Default::default()));
-                                        }
-                                        Some(Shape::Transform { .. }) => (),
-                                        _ => de_unreachable(s),
+                                    _ => de_unreachable(s),
+                                },
+                                "gf" => match _shape.as_mut() {
+                                    None => {
+                                        _shape = Some(Shape::GradientFill(GradientFill::default()));
                                     }
-                                }
-                                "sh" => {
-                                    match _shape.as_mut() {
-                                        None => {
-                                            let path = Shape::Path {
-                                                data: Default::default(),
-                                                direction: if let Some(direction) = _direction {
-                                                    _direction = None;
-                                                    direction
-                                                } else {
-                                                    Default::default()
-                                                },
-                                                text_range: Default::default(),
-                                            };
-                                            _shape = Some(path);
-                                        }
-                                        Some(Shape::Path {
-                                            ref mut direction, ..
-                                        }) => {
-                                            if let Some(saved_direction) = _direction {
-                                                *direction = saved_direction;
-                                                _direction = None;
-                                            }
-                                        }
-                                        _ => de_unreachable(s),
-                                    }
-                                }
-                                "st" => {
-                                    match _shape.as_mut() {
-                                        None => {
-                                            let mut stroke = Stroke::default();
-                                            if let Some(dashes) = _dashes {
-                                                stroke.dashes = dashes;
-                                                _dashes = None;
-                                            }
-                                            _shape = Some(Shape::Stroke(stroke));
-                                        }
-                                        Some(Shape::Stroke(stroke)) => {
-                                            if let Some(dashes) = _dashes {
-                                                stroke.dashes = dashes;
-                                                _dashes = None;
-                                            }
-                                        }
-                                        _ => de_unreachable(s),
-                                    }
-                                }
-                                "gf" => {
-                                    match _shape.as_mut() {
-                                        None => {
-                                            _shape =
-                                                Some(Shape::GradientFill(GradientFill::default()));
-                                        }
-                                        Some(Shape::GradientFill(_)) => (),
-                                        _ => de_unreachable(s),
-                                    }
-                                }
+                                    Some(Shape::GradientFill(_)) => (),
+                                    _ => de_unreachable(s),
+                                },
                                 _ => de_unreachable(s),
                             }
                             s.next_tok(i)?;
@@ -1908,17 +1886,15 @@ impl DeJson for ShapeLayer {
                         s.next_colon(i)?;
 
                         match _shape.as_mut() {
-                            None => {
-                                match s.tok {
-                                    DeJsonTok::U64(_) => {
-                                        _direction = DeJson::de_json(s, i)?;
-                                    }
-                                    DeJsonTok::BlockOpen => {
-                                        _dashes = DeJson::de_json(s, i)?;
-                                    }
-                                    _ => de_unreachable(s),
+                            None => match s.tok {
+                                DeJsonTok::U64(_) => {
+                                    _direction = DeJson::de_json(s, i)?;
                                 }
-                            }
+                                DeJsonTok::BlockOpen => {
+                                    _dashes = DeJson::de_json(s, i)?;
+                                }
+                                _ => de_unreachable(s),
+                            },
                             Some(Shape::Rectangle(rectangle)) => {
                                 rectangle.direction = DeJson::de_json(s, i)?;
                             }
@@ -2372,7 +2348,6 @@ pub enum TextBased {
 
 impl DeJson for TextBased {
     fn de_json(s: &mut DeJsonState, i: &mut std::str::Chars) -> Result<Self, DeJsonErr> {
-
         match s.tok {
             DeJsonTok::U64(_) => {
                 let r = s.as_f64()? as u8;
@@ -2414,7 +2389,6 @@ pub enum TextShape {
 
 impl DeJson for TextShape {
     fn de_json(s: &mut DeJsonState, i: &mut std::str::Chars) -> Result<Self, DeJsonErr> {
-
         match s.tok {
             DeJsonTok::U64(_) => {
                 let r = s.as_f64()? as u8;
@@ -2511,7 +2485,6 @@ pub enum ShapeDirection {
 
 impl DeJson for ShapeDirection {
     fn de_json(s: &mut DeJsonState, i: &mut std::str::Chars) -> Result<Self, DeJsonErr> {
-
         match s.tok {
             DeJsonTok::U64(_) => {
                 let r = s.as_f64()? as u8;
@@ -2596,7 +2569,6 @@ pub enum FillRule {
 
 impl DeJson for FillRule {
     fn de_json(s: &mut DeJsonState, i: &mut std::str::Chars) -> Result<Self, DeJsonErr> {
-
         match s.tok {
             DeJsonTok::U64(_) => {
                 let r = s.as_f64()? as u8;
@@ -2650,7 +2622,6 @@ pub enum LineCap {
 
 impl DeJson for LineCap {
     fn de_json(s: &mut DeJsonState, i: &mut std::str::Chars) -> Result<Self, DeJsonErr> {
-
         match s.tok {
             DeJsonTok::U64(_) => {
                 let r = s.as_f64()? as u8;
@@ -2688,7 +2659,6 @@ pub enum LineJoin {
 
 impl DeJson for LineJoin {
     fn de_json(s: &mut DeJsonState, i: &mut std::str::Chars) -> Result<Self, DeJsonErr> {
-
         match s.tok {
             DeJsonTok::U64(_) => {
                 let r = s.as_f64()? as u8;
@@ -2761,7 +2731,6 @@ pub enum GradientType {
 
 impl DeJson for GradientType {
     fn de_json(s: &mut DeJsonState, i: &mut std::str::Chars) -> Result<Self, DeJsonErr> {
-
         match s.tok {
             DeJsonTok::U64(_) => {
                 let r = s.as_f64()? as u8;
