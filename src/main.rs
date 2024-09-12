@@ -44,22 +44,19 @@ async fn main() {
     loop {
         clear_background(LIGHTGRAY);
 
-        for layer in &model.layers {
+        for layer in model.layers.iter().rev() {
             match &layer.content {
                 LayerContent::Shape(shape) => {
                     let mut _fill = None;
                     let mut _gradient_fill = None;
                     let mut _stroke = None;
-                    for shape in &shape.shapes {
+
+                    for shape in shape.shapes.iter().rev() {
                         match &shape.shape {
                             Shape::Fill(fill) => _fill = Some(fill.clone()),
                             Shape::GradientFill(fill) => _gradient_fill = Some(fill.clone()),
                             Shape::Stroke(stroke) => _stroke = Some(stroke.clone()),
-                            _ => (),
-                        }
-                    }
-                    for shape in &shape.shapes {
-                        match &shape.shape {
+
                             Shape::Rectangle(rectangle) => {
                                 if !rectangle.position.animated && !rectangle.size.animated {
                                     let x = &rectangle.position.keyframes[0].start_value.0.x;
@@ -91,11 +88,47 @@ async fn main() {
                                             let color =
                                                 Color::from_rgba(color.r, color.g, color.b, 255);
                                             draw_rectangle(1., 1., 20., 20., color);
+
+                                            // let mut prev_p: Option<Vector2D>;
+                                            // match b.verticies.first() {
+                                            //     Some(p) => {
+                                            //         builder.begin(p.to_point());
+                                            //         prev_p = Some(*p);
+                                            //     }
+                                            //     None => continue,
+                                            // }
+                                            // for ((p, c1), c2) in b
+                                            //     .verticies
+                                            //     .iter()
+                                            //     .skip(1)
+                                            //     .zip(b.out_tangent.iter())
+                                            //     .zip(b.in_tangent.iter().skip(1))
+                                            // {
+                                            //     if let Some(p0) = prev_p {
+                                            //         let p1 = p0 + *c1;
+                                            //         let p2 = *p + *c2;
+                                            //         if c1.approx_eq(&Vector2D::zero()) && c2.approx_eq(&Vector2D::zero()) {
+                                            //             builder.line_to(p.to_point());
+                                            //         } else if p1.approx_eq(&p2) {
+                                            //             builder.quadratic_bezier_to(p1.to_point(), p.to_point());
+                                            //         } else {
+                                            //             builder.cubic_bezier_to(p1.to_point(), p2.to_point(), p.to_point());
+                                            //         }
+                                            //     }
+                                            //     prev_p = Some(*p);
+                                            // }
+                                            // if b.closed {
+                                            //     let index = b.verticies.len() - 1;
+                                            //     builder.cubic_bezier_to(
+                                            //         (b.verticies[index] + b.out_tangent[index]).to_point(),
+                                            //         (b.verticies[0] + b.in_tangent[0]).to_point(),
+                                            //         b.verticies[0].to_point(),
+                                            //     );
+                                            // }
                                         }
                                     }
                                 }
                             },
-                            Shape::GradientFill(_) | Shape::Fill(_) | Shape::Stroke(_) => (),
                             _ => unimplemented!(),
                         }
                     }
