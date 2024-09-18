@@ -821,6 +821,7 @@ version = "0.1.0"
 dependencies = [
  "contrast_renderer",
  "euclid",
+ "geometric_algebra",
  "glam 0.27.0",
  "lottie",
  "macroquad",

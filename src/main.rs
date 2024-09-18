@@ -132,6 +132,204 @@ fn draw_lottie(model: &Model) {
     }
 }
 
+use contrast_renderer::{
+    error::{Error, ERROR_MARGIN},
+    path::{Path, SegmentType},
+    safe_float::SafeFloat,
+    utils::vec_to_point,
+};
+
+use geometric_algebra::{
+    ppga3d::{Rotor, Translator},
+    GeometricProduct, One, RegressiveProduct,
+};
+
+pub type Vertex0 = [f32; 2];
+
+#[derive(Clone, Copy)]
+#[repr(packed)]
+pub struct Vertex3f(pub [f32; 2], pub [f32; 3]);
+
+#[derive(Default)]
+pub struct FillBuilder {
+    pub solid_indices: Vec<u16>,
+    pub solid_vertices: Vec<Vertex0>,
+    pub rational_quadratic_vertices: Vec<Vertex3f>,
+}
+
+impl FillBuilder {
+    pub fn add_path(
+        &mut self,
+        proto_hull: &mut Vec<SafeFloat<f32, 2>>,
+        path: &Path,
+    ) -> Result<(), Error> {
+        let mut path_solid_vertices: Vec<Vertex0> = Vec::with_capacity(
+            1 + path.line_segments.len()
+                + path.integral_quadratic_curve_segments.len()
+                + path.integral_cubic_curve_segments.len() * 5
+                + path.rational_quadratic_curve_segments.len()
+                + path.rational_cubic_curve_segments.len() * 5,
+        );
+        path_solid_vertices.push(path.start.unwrap());
+        proto_hull.push(path.start);
+        let mut line_segment_iter = path.line_segments.iter();
+        let mut rational_quadratic_curve_segment_iter =
+            path.rational_quadratic_curve_segments.iter();
+        for segment_type in &path.segment_types {
+            match segment_type {
+                SegmentType::Line => {
+                    let segment = line_segment_iter.next().unwrap();
+                    proto_hull.push(segment.control_points[0]);
+                    path_solid_vertices.push(segment.control_points[0].unwrap());
+                }
+                SegmentType::RationalQuadraticCurve => {
+                    let segment = rational_quadratic_curve_segment_iter.next().unwrap();
+                    let weight = 1.0 / segment.weight.unwrap();
+                    self.rational_quadratic_vertices.push(Vertex3f(
+                        segment.control_points[1].unwrap(),
+                        [1.0, 1.0, 1.0],
+                    ));
+                    self.rational_quadratic_vertices.push(Vertex3f(
+                        segment.control_points[0].unwrap(),
+                        [0.5 * weight, 0.0, weight],
+                    ));
+                    self.rational_quadratic_vertices.push(Vertex3f(
+                        *path_solid_vertices.last().unwrap(),
+                        [0.0, 0.0, 1.0],
+                    ));
+                    proto_hull.push(segment.control_points[0]);
+                    proto_hull.push(segment.control_points[1]);
+                    path_solid_vertices.push(segment.control_points[1].unwrap());
+                }
+            }
+        }
+        let start_index = self.solid_vertices.len();
+        self.solid_vertices
+            .append(&mut triangle_fan_to_strip(path_solid_vertices));
+        let mut indices: Vec<u16> =
+            (start_index as u16..(self.solid_vertices.len() + 1) as u16).collect();
+        *indices.iter_mut().last().unwrap() = (-1isize) as u16;
+        self.solid_indices.append(&mut indices);
+        Ok(())
+    }
+}
+
+/// Concats the given sequence of [Buffer]s and serializes them into a `Vec<u8>`
+#[macro_export]
+macro_rules! concat_buffers {
+    (count: $buffer:expr $(,)?) => {
+        1
+    };
+    (count: $buffer:expr, $($rest:expr),+) => {
+        concat_buffers!(count: $($rest),*) + 1
+    };
+    ([$($buffer:expr),* $(,)?]) => {{
+        let buffers = [
+            $(contrast_renderer::utils::transmute_slice::<_, u8>($buffer)),*
+        ];
+        let mut end_offsets = [0; $crate::concat_buffers!(count: $($buffer),*)];
+        let mut buffer_length = 0;
+        for (i, buffer) in buffers.iter().enumerate() {
+            buffer_length += buffer.len();
+            end_offsets[i] = buffer_length;
+        }
+        let buffer_data = buffers.concat();
+        (end_offsets, buffer_data)
+    }};
+}
+
+/// A set of [Path]s which is always rendered together
+struct RenderShape {
+    vertex_offsets: [usize; 3],
+    index_offsets: [usize; 1],
+    vertex_buffer: Vec<u8>,
+    index_buffer: Vec<u8>,
+}
+
+impl RenderShape {
+    fn from_paths(paths: &[Path]) -> Result<Self, Error> {
+        let mut proto_hull = Vec::new();
+        let mut fill_builder = FillBuilder::default();
+        for path in paths {
+            fill_builder.add_path(&mut proto_hull, path)?;
+        }
+        let convex_hull = triangle_fan_to_strip(andrew(&proto_hull));
+        dbg!(&fill_builder.solid_vertices);
+        let (vertex_offsets, vertex_buffer) = concat_buffers!([
+            &fill_builder.solid_vertices,
+            &fill_builder.rational_quadratic_vertices,
+            &convex_hull,
+        ]);
+        dbg!(&fill_builder.solid_indices);
+        let (index_offsets, index_buffer) = concat_buffers!([&fill_builder.solid_indices]);
+
+        Ok(Self {
+            vertex_offsets,
+            index_offsets,
+            vertex_buffer,
+            index_buffer,
+        })
+    }
+}
+
+/// Andrew's (monotone chain) convex hull algorithm
+pub fn andrew(input_points: &[SafeFloat<f32, 2>]) -> Vec<[f32; 2]> {
+    let mut input_points = input_points.to_owned();
+    if input_points.len() < 3 {
+        return input_points
+            .iter()
+            .map(|input_point| input_point.unwrap())
+            .collect();
+    }
+    input_points.sort();
+    let mut hull = Vec::with_capacity(2 * input_points.len());
+    for input_point in input_points.iter().cloned() {
+        while hull.len() > 1
+            && vec_to_point(hull[hull.len() - 2])
+                .regressive_product(vec_to_point(hull[hull.len() - 1]))
+                .regressive_product(vec_to_point(input_point.unwrap()))
+                <= ERROR_MARGIN
+        {
+            hull.pop();
+        }
+        hull.push(input_point.unwrap());
+    }
+    hull.pop();
+    let t = hull.len() + 1;
+    for input_point in input_points.iter().rev().cloned() {
+        while hull.len() > t
+            && vec_to_point(hull[hull.len() - 2])
+                .regressive_product(vec_to_point(hull[hull.len() - 1]))
+                .regressive_product(vec_to_point(input_point.unwrap()))
+                <= ERROR_MARGIN
+        {
+            hull.pop();
+        }
+        hull.push(input_point.unwrap());
+    }
+    hull.pop();
+    hull
+}
+
+#[derive(Clone, Copy)]
+#[repr(packed)]
+pub struct Vertex4f(pub [f32; 2], pub [f32; 4]);
+
+pub fn triangle_fan_to_strip<T: Copy>(vertices: Vec<T>) -> Vec<T> {
+    let gather_indices = (0..vertices.len()).map(|i| {
+        if (i & 1) == 0 {
+            i >> 1
+        } else {
+            vertices.len() - 1 - (i >> 1)
+        }
+    });
+    let mut result = Vec::with_capacity(vertices.len());
+    for src in gather_indices {
+        result.push(vertices[src]);
+    }
+    result
+}
+
 #[macroquad::main("Lottie Example")]
 async fn main() {
     let model = load_lottie_file(false);
@@ -156,25 +354,40 @@ async fn main() {
             // Ensure that macroquad's shapes are not going to be lost
             gl.flush();
 
-            let t = get_time();
-
             gl.quad_context.apply_pipeline(&stage.pipeline);
 
             gl.quad_context
                 .begin_default_pass(miniquad::PassAction::Nothing);
             gl.quad_context.apply_bindings(&stage.bindings);
 
-            for i in 0..10 {
-                let t = t + i as f64 * 0.3;
+            let projection_matrix = contrast_renderer::utils::matrix_multiplication(
+                &contrast_renderer::utils::perspective_projection(
+                    std::f32::consts::PI * 0.5,
+                    screen_width() / screen_height(),
+                    1.0,
+                    1000.0,
+                ),
+                &contrast_renderer::utils::motor3d_to_mat4(
+                    &Translator::new(1.5, 0.0, 0.0, -0.5 * 2.0).geometric_product(Rotor::one()),
+                ),
+            );
+            gl.quad_context
+                .apply_uniforms(miniquad::UniformsSource::table(
+                    &raw_miniquad::shader::Uniforms {
+                        transform_row_0: projection_matrix[0].into(),
+                        transform_row_1: projection_matrix[1].into(),
+                        transform_row_2: projection_matrix[2].into(),
+                        transform_row_3: projection_matrix[3].into(),
+                    },
+                ));
 
-                gl.quad_context
-                    .apply_uniforms(miniquad::UniformsSource::table(
-                        &raw_miniquad::shader::Uniforms {
-                            offset: (t.sin() as f32 * 0.5, (t * 3.).cos() as f32 * 0.5),
-                        },
-                    ));
-                gl.quad_context.draw(0, 6, 1);
-            }
+            gl.quad_context.draw(
+                0,
+                (stage.shape2.index_offsets[0] / std::mem::size_of::<u16>())
+                    .try_into()
+                    .unwrap(),
+                1,
+            );
             gl.quad_context.end_render_pass();
         }
 
@@ -183,59 +396,51 @@ async fn main() {
 }
 
 mod raw_miniquad {
+    use super::RenderShape;
     use miniquad::*;
-
-    #[repr(C)]
-    struct Vec2 {
-        x: f32,
-        y: f32,
-    }
-    #[repr(C)]
-    struct Vertex {
-        pos: Vec2,
-        uv: Vec2,
-    }
 
     pub struct Stage {
         pub pipeline: Pipeline,
         pub bindings: Bindings,
+        pub shape2: RenderShape,
     }
 
     impl Stage {
         pub fn new(ctx: &mut dyn RenderingBackend) -> Stage {
-            #[rustfmt::skip]
-            let vertices: [Vertex; 4] = [
-                Vertex { pos : Vec2 { x: -0.5, y: -0.5 }, uv: Vec2 { x: 0., y: 0. } },
-                Vertex { pos : Vec2 { x:  0.5, y: -0.5 }, uv: Vec2 { x: 1., y: 0. } },
-                Vertex { pos : Vec2 { x:  0.5, y:  0.5 }, uv: Vec2 { x: 1., y: 1. } },
-                Vertex { pos : Vec2 { x: -0.5, y:  0.5 }, uv: Vec2 { x: 0., y: 1. } },
-            ];
+            let shape2 =
+                RenderShape::from_paths(&vec![contrast_renderer::path::Path::from_circle(
+                    [0.0, 0.0],
+                    0.5,
+                )])
+                .unwrap();
+
+            dbg!(shape2.vertex_offsets);
+            // dbg!(&shape2.vertex_buffer);
+            dbg!(shape2.index_offsets);
+            // dbg!(&shape2.index_buffer);
+
+            let vertices = &shape2.vertex_buffer[0..shape2.vertex_offsets[0] as usize];
             let vertex_buffer = ctx.new_buffer(
                 BufferType::VertexBuffer,
                 BufferUsage::Immutable,
                 BufferSource::slice(&vertices),
             );
 
-            let indices: [u16; 6] = [0, 1, 2, 0, 2, 3];
+            let indices = &shape2.index_buffer[0..shape2.index_offsets[0] as usize];
+            let ptr = indices.as_ptr() as *const u16;
+            let len = std::mem::size_of_val(indices) / std::mem::size_of::<u16>();
+            let indices = unsafe { std::slice::from_raw_parts(ptr, len) };
+
             let index_buffer = ctx.new_buffer(
                 BufferType::IndexBuffer,
                 BufferUsage::Immutable,
-                BufferSource::slice(&indices[..]),
+                BufferSource::slice(indices),
             );
-
-            let pixels: [u8; 4 * 4 * 4] = [
-                0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0x00, 0x00, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0x00,
-                0x00, 0xFF, 0xFF, 0x00, 0x00, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0x00, 0x00, 0xFF,
-                0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0x00, 0x00, 0xFF, 0xFF, 0xFF,
-                0xFF, 0xFF, 0xFF, 0x00, 0x00, 0xFF, 0xFF, 0x00, 0x00, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
-                0xFF, 0x00, 0x00, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
-            ];
-            let texture = ctx.new_texture_from_rgba8(4, 4, &pixels);
 
             let bindings = Bindings {
                 vertex_buffers: vec![vertex_buffer],
                 index_buffer,
-                images: vec![texture],
+                images: vec![],
             };
 
             let shader = ctx
@@ -250,15 +455,19 @@ mod raw_miniquad {
 
             let pipeline = ctx.new_pipeline(
                 &[BufferLayout::default()],
-                &[
-                    VertexAttribute::new("pos", VertexFormat::Float2),
-                    VertexAttribute::new("uv", VertexFormat::Float2),
-                ],
+                &[VertexAttribute::new("position", VertexFormat::Float2)],
                 shader,
-                Default::default(),
+                PipelineParams {
+                    primitive_type: PrimitiveType::TriangleStrip,
+                    ..Default::default()
+                },
             );
 
-            Stage { pipeline, bindings }
+            Stage {
+                pipeline,
+                bindings,
+                shape2,
+            }
         }
     }
 
@@ -266,39 +475,56 @@ mod raw_miniquad {
         use miniquad::*;
 
         pub const VERTEX: &str = r#"#version 100
-attribute vec2 pos;
-attribute vec2 uv;
+precision lowp float;
 
-uniform vec2 offset;
+uniform vec4 transform_row_0;
+uniform vec4 transform_row_1;
+uniform vec4 transform_row_2;
+uniform vec4 transform_row_3;
 
-varying lowp vec2 texcoord;
+attribute vec2 position;
+
+mat4 instance_transform(mat4 instance) {
+    return mat4(
+        instance[0],
+        instance[1],
+        instance[2],
+        instance[3]
+    );
+}
 
 void main() {
-    gl_Position = vec4(pos + offset, 0, 1);
-    texcoord = uv;
-}"#;
+    mat4 instance = mat4(transform_row_0, transform_row_1,
+                         transform_row_2, transform_row_3);
+    gl_Position = instance_transform(instance) * vec4(position, 0.0, 1.0);
+}
+"#;
 
         pub const FRAGMENT: &str = r#"#version 100
-varying lowp vec2 texcoord;
-
-uniform sampler2D tex;
-
 void main() {
-    gl_FragColor = texture2D(tex, texcoord);
+    gl_FragColor = vec4(0.1, 0.5, 0.2, 1.0);
 }"#;
 
         pub fn meta() -> ShaderMeta {
             ShaderMeta {
-                images: vec!["tex".to_string()],
+                images: vec![],
                 uniforms: UniformBlockLayout {
-                    uniforms: vec![UniformDesc::new("offset", UniformType::Float2)],
+                    uniforms: vec![
+                        UniformDesc::new("transform_row_0", UniformType::Float4),
+                        UniformDesc::new("transform_row_1", UniformType::Float4),
+                        UniformDesc::new("transform_row_2", UniformType::Float4),
+                        UniformDesc::new("transform_row_3", UniformType::Float4),
+                    ],
                 },
             }
         }
 
         #[repr(C)]
         pub struct Uniforms {
-            pub offset: (f32, f32),
+            pub transform_row_0: [f32; 4],
+            pub transform_row_1: [f32; 4],
+            pub transform_row_2: [f32; 4],
+            pub transform_row_3: [f32; 4],
         }
     }
 }

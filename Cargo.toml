@@ -9,6 +9,7 @@ macroquad = { path = "../macroquad" }
 miniquad = { path = "../miniquad", features = ["log-impl"] }
 
 contrast_renderer = { path = "../contrast_renderer" }
+geometric_algebra = "0.3.0"
 
 glam = {version = "0.27.0", features = ["scalar-math"] } # to conform to macroquad
 euclid = "0.22.7"
