@@ -71,7 +71,7 @@ impl FillBuilder {
             .append(&mut triangle_fan_to_strip(path_solid_vertices));
         let mut indices: Vec<u16> =
             (start_index as u16..(self.solid_vertices.len() + 1) as u16).collect();
-        *indices.iter_mut().last().unwrap() = (-1isize) as u16;
+        *indices.iter_mut().last().unwrap() = 0;
         self.solid_indices.append(&mut indices);
         Ok(())
     }
