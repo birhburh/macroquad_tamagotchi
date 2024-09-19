@@ -1,11 +1,16 @@
-use contrast_renderer::{
+// Most of it copied from https://github.com/Lichtso/contrast_renderer
+mod error;
+mod path;
+mod safe_float;
+pub mod utils;
+
+use {
     error::{Error, ERROR_MARGIN},
+    geometric_algebra::RegressiveProduct,
     path::{Path, SegmentType},
     safe_float::SafeFloat,
     utils::vec_to_point,
 };
-
-use geometric_algebra::RegressiveProduct;
 
 pub type Vertex0 = [f32; 2];
 
@@ -83,7 +88,7 @@ macro_rules! concat_buffers {
     };
     ([$($buffer:expr),* $(,)?]) => {{
         let buffers = [
-            $(contrast_renderer::utils::transmute_slice::<_, u8>($buffer)),*
+            $(utils::transmute_slice::<_, u8>($buffer)),*
         ];
         let mut end_offsets = [0; $crate::concat_buffers!(count: $($buffer),*)];
         let mut buffer_length = 0;
@@ -186,6 +191,7 @@ pub fn triangle_fan_to_strip<T: Copy>(vertices: Vec<T>) -> Vec<T> {
 }
 
 pub mod raw_miniquad {
+    use super::path::Path;
     use super::RenderShape;
     use miniquad::*;
 
@@ -200,11 +206,7 @@ pub mod raw_miniquad {
     impl Stage {
         pub fn new(ctx: &mut dyn RenderingBackend) -> Stage {
             let shape2 =
-                RenderShape::from_paths(&vec![contrast_renderer::path::Path::from_circle(
-                    [0.0, 0.0],
-                    0.5,
-                )])
-                .unwrap();
+                RenderShape::from_paths(&vec![Path::from_circle([0.0, 0.0], 0.5)]).unwrap();
 
             let vertices = &shape2.vertex_buffer[0..shape2.vertex_offsets[0] as usize];
             let vertex_buffer = ctx.new_buffer(

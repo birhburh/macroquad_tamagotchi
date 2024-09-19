@@ -8,7 +8,7 @@ use {
         GeometricProduct, One,
     },
     macroquad::prelude::*,
-    shape_rendering::{raw_miniquad, Vertex3f},
+    shape_rendering::{raw_miniquad, Vertex3f, utils::{matrix_multiplication, perspective_projection, motor3d_to_mat4}},
 };
 
 #[macroquad::main("Lottie Example")]
@@ -32,14 +32,14 @@ async fn main() {
         {
             let mut gl = unsafe { get_internal_gl() };
 
-            let projection_matrix = contrast_renderer::utils::matrix_multiplication(
-                &contrast_renderer::utils::perspective_projection(
+            let projection_matrix = matrix_multiplication(
+                &perspective_projection(
                     std::f32::consts::PI * 0.5,
                     screen_width() / screen_height(),
                     1.0,
                     1000.0,
                 ),
-                &contrast_renderer::utils::motor3d_to_mat4(
+                &motor3d_to_mat4(
                     &Translator::new(1.5, 0.0, 0.0, -0.5 * 2.0).geometric_product(Rotor::one()),
                 ),
             );
@@ -73,9 +73,6 @@ async fn main() {
 
             gl.quad_context
                 .apply_pipeline(&stage.fill_rational_quadratic_curve_pipeline);
-
-            gl.quad_context
-                .begin_default_pass(miniquad::PassAction::Nothing);
             gl.quad_context
                 .apply_bindings(&stage.fill_rational_quadratic_curve_bindings);
 
