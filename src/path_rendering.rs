@@ -54,9 +54,14 @@ pub mod raw_miniquad {
 
             let fill_solid_shader = ctx
                 .new_shader(
-                    miniquad::ShaderSource::Glsl {
-                        vertex: shader::FILL_VERTEX,
-                        fragment: shader::FILL_FRAGMENT,
+                    match ctx.info().backend {
+                        Backend::OpenGl => ShaderSource::Glsl {
+                            vertex: shader::FILL_VERTEX,
+                            fragment: shader::FILL_FRAGMENT,
+                        },
+                        Backend::Metal => ShaderSource::Msl {
+                            program: shader::FILL_METAL,
+                        },
                     },
                     shader::meta(),
                 )
@@ -98,9 +103,14 @@ pub mod raw_miniquad {
             };
             let fill_rational_quadratic_curve_shader = ctx
                 .new_shader(
-                    miniquad::ShaderSource::Glsl {
-                        vertex: shader::QUADRATIC_VERTEX,
-                        fragment: shader::QUADRATIC_FRAGMENT,
+                    match ctx.info().backend {
+                        Backend::OpenGl => ShaderSource::Glsl {
+                            vertex: shader::QUADRATIC_VERTEX,
+                            fragment: shader::QUADRATIC_FRAGMENT,
+                        },
+                        Backend::Metal => ShaderSource::Msl {
+                            program: shader::QUADRATIC_METAL,
+                        },
                     },
                     shader::meta(),
                 )
@@ -158,6 +168,48 @@ void main() {
     gl_FragColor = vec4(0.1, 0.5, 0.2, 1.0);
 }"#;
 
+        pub const FILL_METAL: &str = r#"
+    #include <metal_stdlib>
+
+    using namespace metal;
+
+    struct Uniforms
+    {
+        float4 transform_row_0;
+        float4 transform_row_1;
+        float4 transform_row_2;
+        float4 transform_row_3;
+    };
+
+    struct Vertex
+    {
+        float2 position      [[attribute(0)]];
+    };
+
+    struct RasterizerData
+    {
+        float4 position [[position]];
+    };
+
+    vertex RasterizerData vertexShader(Vertex v [[stage_in]], constant Uniforms& uniforms [[buffer(0)]])
+    {
+        RasterizerData out;
+
+        float4x4 instance = float4x4(uniforms.transform_row_0,
+                                     uniforms.transform_row_1,
+                                     uniforms.transform_row_2,
+                                     uniforms.transform_row_3);
+        out.position = instance * float4(v.position, 0.0, 1.0);
+
+        return out;
+    }
+
+    fragment float4 fragmentShader(RasterizerData in [[stage_in]])
+    {
+        return float4(0.1, 0.5, 0.2, 1.0);
+    }
+"#;
+
         pub const QUADRATIC_VERTEX: &str = r#"#version 100
 precision lowp float;
 
@@ -190,6 +242,56 @@ vec4 coverage(bool keep) {
 void main() {
     gl_FragColor = coverage((weights.x * weights.x - weights.y * weights.z) <= 0.0);
 }"#;
+
+
+pub const QUADRATIC_METAL: &str = r#"
+    #include <metal_stdlib>
+
+    using namespace metal;
+
+    struct Uniforms
+    {
+        float4 transform_row_0;
+        float4 transform_row_1;
+        float4 transform_row_2;
+        float4 transform_row_3;
+    };
+
+    struct Vertex
+    {
+        float2 position      [[attribute(0)]];
+        float3 in_weights    [[attribute(1)]];
+    };
+
+    struct RasterizerData
+    {
+        float4 position [[position]];
+        float3 weights [[user(locn0)]];
+    };
+
+    vertex RasterizerData vertexShader(Vertex v [[stage_in]], constant Uniforms& uniforms [[buffer(0)]])
+    {
+        RasterizerData out;
+
+        float4x4 instance = float4x4(uniforms.transform_row_0,
+                                     uniforms.transform_row_1,
+                                     uniforms.transform_row_2,
+                                     uniforms.transform_row_3);
+        out.position = instance * float4(v.position, 0.0, 1.0);
+        out.weights = v.in_weights;
+
+        return out;
+    }
+
+    float4 coverage(bool keep) {
+        return keep ? float4(0.1, 0.5, 0.2, 1.0) : float4(0.0);
+    }
+
+    fragment float4 fragmentShader(RasterizerData in [[stage_in]])
+    {
+        return coverage((in.weights.x * in.weights.x - in.weights.y * in.weights.z) <= 0.0);
+    }
+"#;
 
         pub fn meta() -> ShaderMeta {
             ShaderMeta {

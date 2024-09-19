@@ -15,7 +15,19 @@ use {
     },
 };
 
-#[macroquad::main("Lottie Example")]
+
+fn window_conf() -> Conf {
+    Conf {
+        window_title: "Lottie Example".to_owned(),
+        platform: miniquad::conf::Platform {
+            apple_gfx_api: miniquad::conf::AppleGfxApi::Metal,
+            ..Default::default()
+        },
+        ..Default::default()
+    }
+}
+
+#[macroquad::main(window_conf)]
 async fn main() {
     // let model = nanolottie::load_lottie_file(false);
     // dbg!(&model);
@@ -51,10 +63,10 @@ async fn main() {
             // Ensure that macroquad's shapes are not going to be lost
             gl.flush();
 
-            gl.quad_context.apply_pipeline(&stage.fill_solid_pipeline);
-
             gl.quad_context
                 .begin_default_pass(miniquad::PassAction::Nothing);
+
+            gl.quad_context.apply_pipeline(&stage.fill_solid_pipeline);
             gl.quad_context.apply_bindings(&stage.fill_solid_bindings);
 
             gl.quad_context
