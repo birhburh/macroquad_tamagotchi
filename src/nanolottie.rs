@@ -1,8 +1,7 @@
-
 use {
+    crate::model::{LayerContent, Model, Shape},
     lottie::prelude::Bezier,
     macroquad::prelude::*,
-    crate::model::{LayerContent, Model, Shape},
     nanoserde::{DeJson, SerJson},
     serde_json,
     std::fs,
