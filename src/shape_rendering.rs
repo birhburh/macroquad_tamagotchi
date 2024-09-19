@@ -58,6 +58,7 @@ impl FillBuilder {
                     proto_hull.push(segment.control_points[1]);
                     path_solid_vertices.push(segment.control_points[1].unwrap());
                 }
+                _ => (),
             }
         }
         let start_index = self.solid_vertices.len();
@@ -168,10 +169,6 @@ pub fn andrew(input_points: &[SafeFloat<f32, 2>]) -> Vec<[f32; 2]> {
     hull.pop();
     hull
 }
-
-#[derive(Clone, Copy)]
-#[repr(packed)]
-pub struct Vertex4f(pub [f32; 2], pub [f32; 4]);
 
 pub fn triangle_fan_to_strip<T: Copy>(vertices: Vec<T>) -> Vec<T> {
     let gather_indices = (0..vertices.len()).map(|i| {
