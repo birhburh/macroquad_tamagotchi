@@ -1,6 +1,6 @@
 mod model;
 mod nanolottie;
-mod shape_rendering;
+mod path_rendering;
 
 use {
     geometric_algebra::{
@@ -8,7 +8,11 @@ use {
         GeometricProduct, One,
     },
     macroquad::prelude::*,
-    shape_rendering::{raw_miniquad, Vertex3f, utils::{matrix_multiplication, perspective_projection, motor3d_to_mat4}},
+    path_rendering::{
+        raw_miniquad,
+        utils::{matrix_multiplication, motor3d_to_mat4, perspective_projection},
+        vertex::Vertex3f,
+    },
 };
 
 #[macroquad::main("Lottie Example")]

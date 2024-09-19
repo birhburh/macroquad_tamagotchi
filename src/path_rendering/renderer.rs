@@ -1,0 +1,181 @@
+//! Rendering of [Path]s bundeled in [Shape]s using a [Renderer]
+
+use {
+    super::{
+        error::{Error, ERROR_MARGIN},
+        fill::FillBuilder,
+        path::{DynamicStrokeOptions, Path, MAX_DASH_INTERVALS},
+        safe_float::SafeFloat,
+        utils::{transmute_slice, vec_to_point},
+        vertex::triangle_fan_to_strip,
+    },
+    geometric_algebra::RegressiveProduct,
+};
+
+/// Color used in [RenderOperation::Color]
+pub type Color = SafeFloat<f32, 4>;
+
+#[derive(Default, Clone)]
+#[repr(C)]
+struct DynamicStrokeDescriptor {
+    gap_start: [f32; MAX_DASH_INTERVALS],
+    gap_end: [f32; MAX_DASH_INTERVALS],
+    caps: u32,
+    count_dashed_join: u32,
+    phase: f32,
+    _padding: u32,
+}
+
+fn convert_dynamic_stroke_options(
+    dynamic_stroke_options: &DynamicStrokeOptions,
+) -> Result<DynamicStrokeDescriptor, Error> {
+    match dynamic_stroke_options {
+        DynamicStrokeOptions::Dashed {
+            join,
+            pattern,
+            phase,
+        } => {
+            if pattern.len() > MAX_DASH_INTERVALS {
+                return Err(Error::TooManyDashIntervals);
+            }
+            let mut result = DynamicStrokeDescriptor {
+                gap_start: [0.0; MAX_DASH_INTERVALS],
+                gap_end: [0.0; MAX_DASH_INTERVALS],
+                caps: 0,
+                count_dashed_join: ((pattern.len() as u32 - 1) << 3) | 4 | *join as u32,
+                phase: phase.unwrap(),
+                _padding: 0,
+            };
+            for (i, dash_interval) in pattern.iter().enumerate() {
+                result.gap_start[i] = dash_interval.gap_start.unwrap();
+                result.gap_end[i] = dash_interval.gap_end.unwrap();
+                result.caps |= (dash_interval.dash_start as u32)
+                    << (((i + pattern.len() - 1) % pattern.len()) * 8);
+                result.caps |= (dash_interval.dash_end as u32) << (i * 8 + 4);
+            }
+            Ok(result)
+        }
+        DynamicStrokeOptions::Solid { join, start, end } => Ok(DynamicStrokeDescriptor {
+            gap_start: [0.0; MAX_DASH_INTERVALS],
+            gap_end: [0.0; MAX_DASH_INTERVALS],
+            caps: *start as u32 | ((*end as u32) << 4),
+            count_dashed_join: *join as u32,
+            phase: 0.0,
+            _padding: 0,
+        }),
+    }
+}
+
+/// Concats the given sequence of [Buffer]s and serializes them into a `Vec<u8>`
+#[macro_export]
+macro_rules! concat_buffers {
+    (count: $buffer:expr $(,)?) => {
+        1
+    };
+    (count: $buffer:expr, $($rest:expr),+) => {
+        concat_buffers!(count: $($rest),*) + 1
+    };
+    ([$($buffer:expr),* $(,)?]) => {{
+        let buffers = [
+            $(transmute_slice::<_, u8>($buffer)),*
+        ];
+        let mut end_offsets = [0; concat_buffers!(count: $($buffer),*)];
+        let mut buffer_length = 0;
+        for (i, buffer) in buffers.iter().enumerate() {
+            buffer_length += buffer.len();
+            end_offsets[i] = buffer_length;
+        }
+        let buffer_data = buffers.concat();
+        (end_offsets, buffer_data)
+    }};
+}
+
+/// Which shader to use for rendering a shape
+#[derive(Clone, Copy, PartialOrd, Ord, PartialEq, Eq, Debug)]
+pub enum RenderOperation {
+    /// Prepare rendering the [Shape]
+    Stencil,
+    /// Start using the rendered [Shape] as stencil for other [Shape]s
+    Clip,
+    /// Stop using the rendered [Shape] as stencil for other [Shape]s
+    UnClip,
+    /// Render the [Shape] as a solid color using alpha blending
+    Color,
+    /// Start using the rendered [Shape] as opacity group for other [Shape]s
+    SaveAlphaContext,
+    /// Second step of [RenderOperation::SaveAlphaContext], needs its own [wgpu::RenderPass]
+    ScaleAlphaContext,
+    /// Stop using the rendered [Shape] as opacity group for other [Shape]s
+    RestoreAlphaContext,
+}
+
+/// A set of [Path]s which is always rendered together
+pub struct Shape {
+    pub vertex_offsets: [usize; 3],
+    pub index_offsets: [usize; 1],
+    pub vertex_buffer: Vec<u8>,
+    pub index_buffer: Vec<u8>,
+}
+
+/// Andrew's (monotone chain) convex hull algorithm
+pub fn andrew(input_points: &[SafeFloat<f32, 2>]) -> Vec<[f32; 2]> {
+    let mut input_points = input_points.to_owned();
+    if input_points.len() < 3 {
+        return input_points
+            .iter()
+            .map(|input_point| input_point.unwrap())
+            .collect();
+    }
+    input_points.sort();
+    let mut hull = Vec::with_capacity(2 * input_points.len());
+    for input_point in input_points.iter().cloned() {
+        while hull.len() > 1
+            && vec_to_point(hull[hull.len() - 2])
+                .regressive_product(vec_to_point(hull[hull.len() - 1]))
+                .regressive_product(vec_to_point(input_point.unwrap()))
+                <= ERROR_MARGIN
+        {
+            hull.pop();
+        }
+        hull.push(input_point.unwrap());
+    }
+    hull.pop();
+    let t = hull.len() + 1;
+    for input_point in input_points.iter().rev().cloned() {
+        while hull.len() > t
+            && vec_to_point(hull[hull.len() - 2])
+                .regressive_product(vec_to_point(hull[hull.len() - 1]))
+                .regressive_product(vec_to_point(input_point.unwrap()))
+                <= ERROR_MARGIN
+        {
+            hull.pop();
+        }
+        hull.push(input_point.unwrap());
+    }
+    hull.pop();
+    hull
+}
+
+impl Shape {
+    pub fn from_paths(paths: &[Path]) -> Result<Self, Error> {
+        let mut proto_hull = Vec::new();
+        let mut fill_builder = FillBuilder::default();
+        for path in paths {
+            fill_builder.add_path(&mut proto_hull, path)?;
+        }
+        let convex_hull = triangle_fan_to_strip(andrew(&proto_hull));
+        let (vertex_offsets, vertex_buffer) = concat_buffers!([
+            &fill_builder.solid_vertices,
+            &fill_builder.rational_quadratic_vertices,
+            &convex_hull,
+        ]);
+        let (index_offsets, index_buffer) = concat_buffers!([&fill_builder.solid_indices]);
+
+        Ok(Self {
+            vertex_offsets,
+            index_offsets,
+            vertex_buffer,
+            index_buffer,
+        })
+    }
+}
