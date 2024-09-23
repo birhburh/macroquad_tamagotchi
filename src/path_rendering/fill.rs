@@ -8,7 +8,7 @@ use super::{
     path::{Path, SegmentType},
     safe_float::SafeFloat,
     utils::{point_to_vec, vec_to_point, weighted_vec_to_point},
-    vertex::{triangle_fan_to_strip, Vertex0, Vertex2f, Vertex3f, Vertex4f},
+    vertex::{triangle_fan_to_triangles, Vertex0, Vertex2f, Vertex3f, Vertex4f},
 };
 use geometric_algebra::{
     polynomial::Root, ppga2d, ppga3d, InnerProduct, RegressiveProduct, SquaredMagnitude, Zero,
@@ -435,10 +435,9 @@ impl FillBuilder {
         }
         let start_index = self.solid_vertices.len();
         self.solid_vertices
-            .append(&mut triangle_fan_to_strip(path_solid_vertices));
+            .append(&mut triangle_fan_to_triangles(path_solid_vertices));
         let mut indices: Vec<u16> =
-            (start_index as u16..(self.solid_vertices.len() + 1) as u16).collect();
-        *indices.iter_mut().last().unwrap() = (-1isize) as u16;
+            (start_index as u16..(self.solid_vertices.len()) as u16).collect();
         self.solid_indices.append(&mut indices);
         Ok(())
     }

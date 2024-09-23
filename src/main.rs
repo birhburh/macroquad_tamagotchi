@@ -17,12 +17,15 @@ use {
 
 
 fn window_conf() -> Conf {
+    let sample_count = 1;
     Conf {
-        window_title: "Lottie Example".to_owned(),
+        window_title: format!("Lottie Example (sample_count = {sample_count})").to_owned(),
         platform: miniquad::conf::Platform {
-            apple_gfx_api: miniquad::conf::AppleGfxApi::Metal,
+            apple_gfx_api: miniquad::conf::AppleGfxApi::OpenGl,
             ..Default::default()
         },
+        // high_dpi: true,
+        sample_count,
         ..Default::default()
     }
 }
@@ -102,8 +105,8 @@ async fn main() {
                     },
                 ));
 
-            let begin_offset = stage.shape2.vertex_offsets[0];
-            let end_offset = stage.shape2.vertex_offsets[1];
+            let begin_offset = stage.shape2.vertex_offsets[2];
+            let end_offset = stage.shape2.vertex_offsets[3];
             let vertex_size = std::mem::size_of::<Vertex3f>();
             gl.quad_context.draw(
                 0,

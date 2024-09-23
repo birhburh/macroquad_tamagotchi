@@ -112,7 +112,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "efe23d02309319171d00d794c9ff48d4f903c0e481375b1b04b017470838af04"
 dependencies = [
  "hashbrown",
- "ttf-parser",
+ "ttf-parser 0.21.1",
 ]
 
 [[package]]
@@ -190,6 +190,7 @@ dependencies = [
  "nanoserde",
  "serde",
  "serde_json",
+ "ttf-parser 0.14.0",
 ]
 
 [[package]]
@@ -210,7 +211,6 @@ checksum = "78ca9ab1a0babb1e7d5695e3530886289c18cf2f87ec19a575a0abdce112e3a3"
 [[package]]
 name = "miniquad"
 version = "0.4.6"
-source = "git+https://github.com/birhburh/miniquad?branch=triangle_strip#b84e8824b80a8d6aaae7b2c81a83645e0f71c1f4"
 dependencies = [
  "libc",
  "ndk-sys",
@@ -371,6 +371,12 @@ dependencies = [
  "quote",
  "unicode-ident",
 ]
+
+[[package]]
+name = "ttf-parser"
+version = "0.14.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4ccbe8381883510b6a2d8f1e32905bddd178c11caef8083086d0c0c9ab0ac281"
 
 [[package]]
 name = "ttf-parser"

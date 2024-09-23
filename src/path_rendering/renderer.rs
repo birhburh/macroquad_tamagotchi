@@ -4,67 +4,13 @@ use {
     super::{
         error::{Error, ERROR_MARGIN},
         fill::FillBuilder,
-        path::{DynamicStrokeOptions, Path, MAX_DASH_INTERVALS},
+        path::Path,
         safe_float::SafeFloat,
         utils::{transmute_slice, vec_to_point},
-        vertex::triangle_fan_to_strip,
+        vertex::triangle_fan_to_triangles,
     },
     geometric_algebra::RegressiveProduct,
 };
-
-/// Color used in [RenderOperation::Color]
-pub type Color = SafeFloat<f32, 4>;
-
-#[derive(Default, Clone)]
-#[repr(C)]
-struct DynamicStrokeDescriptor {
-    gap_start: [f32; MAX_DASH_INTERVALS],
-    gap_end: [f32; MAX_DASH_INTERVALS],
-    caps: u32,
-    count_dashed_join: u32,
-    phase: f32,
-    _padding: u32,
-}
-
-fn convert_dynamic_stroke_options(
-    dynamic_stroke_options: &DynamicStrokeOptions,
-) -> Result<DynamicStrokeDescriptor, Error> {
-    match dynamic_stroke_options {
-        DynamicStrokeOptions::Dashed {
-            join,
-            pattern,
-            phase,
-        } => {
-            if pattern.len() > MAX_DASH_INTERVALS {
-                return Err(Error::TooManyDashIntervals);
-            }
-            let mut result = DynamicStrokeDescriptor {
-                gap_start: [0.0; MAX_DASH_INTERVALS],
-                gap_end: [0.0; MAX_DASH_INTERVALS],
-                caps: 0,
-                count_dashed_join: ((pattern.len() as u32 - 1) << 3) | 4 | *join as u32,
-                phase: phase.unwrap(),
-                _padding: 0,
-            };
-            for (i, dash_interval) in pattern.iter().enumerate() {
-                result.gap_start[i] = dash_interval.gap_start.unwrap();
-                result.gap_end[i] = dash_interval.gap_end.unwrap();
-                result.caps |= (dash_interval.dash_start as u32)
-                    << (((i + pattern.len() - 1) % pattern.len()) * 8);
-                result.caps |= (dash_interval.dash_end as u32) << (i * 8 + 4);
-            }
-            Ok(result)
-        }
-        DynamicStrokeOptions::Solid { join, start, end } => Ok(DynamicStrokeDescriptor {
-            gap_start: [0.0; MAX_DASH_INTERVALS],
-            gap_end: [0.0; MAX_DASH_INTERVALS],
-            caps: *start as u32 | ((*end as u32) << 4),
-            count_dashed_join: *join as u32,
-            phase: 0.0,
-            _padding: 0,
-        }),
-    }
-}
 
 /// Concats the given sequence of [Buffer]s and serializes them into a `Vec<u8>`
 #[macro_export]
@@ -111,7 +57,7 @@ pub enum RenderOperation {
 
 /// A set of [Path]s which is always rendered together
 pub struct Shape {
-    pub vertex_offsets: [usize; 3],
+    pub vertex_offsets: [usize; 6],
     pub index_offsets: [usize; 1],
     pub vertex_buffer: Vec<u8>,
     pub index_buffer: Vec<u8>,
@@ -163,12 +109,17 @@ impl Shape {
         for path in paths {
             fill_builder.add_path(&mut proto_hull, path)?;
         }
-        let convex_hull = triangle_fan_to_strip(andrew(&proto_hull));
+        let convex_hull = triangle_fan_to_triangles(andrew(&proto_hull));
         let (vertex_offsets, vertex_buffer) = concat_buffers!([
             &fill_builder.solid_vertices,
+            &fill_builder.integral_quadratic_vertices,
+            &fill_builder.integral_cubic_vertices,
             &fill_builder.rational_quadratic_vertices,
+            &fill_builder.rational_cubic_vertices,
             &convex_hull,
         ]);
+        dbg!(fill_builder.solid_vertices);
+        dbg!(&fill_builder.solid_indices);
         let (index_offsets, index_buffer) = concat_buffers!([&fill_builder.solid_indices]);
 
         Ok(Self {

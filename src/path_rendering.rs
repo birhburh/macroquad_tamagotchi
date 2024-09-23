@@ -8,12 +8,18 @@ mod safe_float;
 mod stroke;
 pub mod utils;
 pub mod vertex;
+pub extern crate ttf_parser;
+mod text;
 
 use vertex::Vertex3f;
+
+const OPEN_SANS_TTF: &[u8] = include_bytes!("../fonts/OpenSans-Regular.ttf");
 
 pub mod raw_miniquad {
     use super::path::Path;
     use super::renderer::Shape;
+    use super::text::{paths_of_text, Layout, Orientation, Alignment};
+    use super::OPEN_SANS_TTF;
     use miniquad::*;
 
     pub struct Stage {
@@ -26,7 +32,29 @@ pub mod raw_miniquad {
 
     impl Stage {
         pub fn new(ctx: &mut dyn RenderingBackend) -> Stage {
-            let shape2 = Shape::from_paths(&vec![Path::from_circle([0.0, 0.0], 0.5)]).unwrap();
+            let font_face = ttf_parser::Face::from_slice(OPEN_SANS_TTF, 0).unwrap();
+            let mut paths = paths_of_text(
+                &font_face,
+                &Layout {
+                    size: 2.7.into(),
+                    orientation: Orientation::LeftToRight,
+                    major_alignment: Alignment::Center,
+                    minor_alignment: Alignment::Center,
+                },
+                "I",
+                // "T",
+                // "H",
+                // "HW",
+                // "Hello World",
+                None,
+            );
+            for path in &mut paths {
+                path.reverse();
+            }
+            paths[0].stroke_options = None;
+            let shape2 = Shape::from_paths(&paths).unwrap();
+
+            // let shape2 = Shape::from_paths(&vec![Path::from_circle([0.0, 0.0], 0.5)]).unwrap();
 
             let vertices = &shape2.vertex_buffer[0..shape2.vertex_offsets[0] as usize];
             let vertex_buffer = ctx.new_buffer(
@@ -72,13 +100,13 @@ pub mod raw_miniquad {
                 &[VertexAttribute::new("position", VertexFormat::Float2)],
                 fill_solid_shader,
                 PipelineParams {
-                    primitive_type: PrimitiveType::TriangleStrip,
+                    primitive_type: PrimitiveType::Triangles,
                     ..Default::default()
                 },
             );
 
-            let begin_offset: usize = shape2.vertex_offsets[0];
-            let end_offset = shape2.vertex_offsets[1];
+            let begin_offset: usize = shape2.vertex_offsets[2];
+            let end_offset = shape2.vertex_offsets[3];
             let vertices = &shape2.vertex_buffer[begin_offset..end_offset];
             let vertex_buffer = ctx.new_buffer(
                 BufferType::VertexBuffer,
@@ -236,7 +264,12 @@ precision lowp float;
 varying vec3 weights;
 
 vec4 coverage(bool keep) {
-    return keep ? vec4(0.1, 0.5, 0.2, 1.0) : vec4(0.0);
+    if (keep)
+        return vec4(0.1, 0.5, 0.2, 1.0);
+    else
+        return vec4(0.0);
+        // return vec4(0.1, 0.5, 0.2, 0.5);
+        // discard;
 }
 
 void main() {
