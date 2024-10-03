@@ -3,6 +3,12 @@ name = "macroquad_tamagotchi"
 version = "0.1.0"
 edition = "2021"
 
+[package.metadata.android]
+label = "MACROQUAD TAMOGOTCHI"
+min_sdk_version = 26
+target_sdk_version = 28
+build_targets = ["armv7-linux-androideabi"]
+
 [dependencies]
 # macroquad = { path = "../macroquad" }
 macroquad = "0.4"
