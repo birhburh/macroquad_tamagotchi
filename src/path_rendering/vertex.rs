@@ -31,13 +31,11 @@ pub fn triangle_fan_to_triangles<T: Copy + std::fmt::Debug>(vertices: Vec<T>) ->
     // if more vertices it looks like this:
     // 0 1 2 3 4 5 6 7 8 9 10 11
     // 0 1 2 0 2 3 0 3 4 0  4  5
-    let gather_indices = (0..((vertices.len() - 2) * 3)).map(|i| {
-        match i % 3 {
-            0 => 0,
-            1 => (i / 3) + 1,
-            2 => (i / 3) + 2,
-            _ => unreachable!()
-        }
+    let gather_indices = (0..((vertices.len() - 2) * 3)).map(|i| match i % 3 {
+        0 => 0,
+        1 => (i / 3) + 1,
+        2 => (i / 3) + 2,
+        _ => unreachable!(),
     });
 
     let mut result = Vec::with_capacity((vertices.len() - 2) * 3);

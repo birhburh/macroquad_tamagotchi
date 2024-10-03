@@ -118,8 +118,7 @@ impl Shape {
             &fill_builder.rational_cubic_vertices,
             &convex_hull,
         ]);
-        dbg!(fill_builder.solid_vertices);
-        dbg!(&fill_builder.solid_indices);
+        dbg!(convex_hull);
         let (index_offsets, index_buffer) = concat_buffers!([&fill_builder.solid_indices]);
 
         Ok(Self {

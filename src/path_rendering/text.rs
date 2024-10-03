@@ -3,9 +3,8 @@
 use super::{
     path::{IntegralCubicCurveSegment, IntegralQuadraticCurveSegment, LineSegment, Path},
     safe_float::SafeFloat,
-    utils::{aabb_to_convex_polygon, do_convex_polygons_overlap, translate2d},
+    utils::translate2d,
 };
-use geometric_algebra::ppga2d;
 
 /// Heap allocated font with a closed lifetime.
 pub struct Font {
@@ -75,15 +74,17 @@ impl ttf_parser::OutlineBuilder for OutlineBuilder {
     }
 
     fn quad_to(&mut self, x1: f32, y1: f32, x: f32, y: f32) {
-        self.path.push_integral_quadratic_curve(IntegralQuadraticCurveSegment {
-            control_points: [[x1, y1].into(), [x, y].into()],
-        });
+        self.path
+            .push_integral_quadratic_curve(IntegralQuadraticCurveSegment {
+                control_points: [[x1, y1].into(), [x, y].into()],
+            });
     }
 
     fn curve_to(&mut self, x1: f32, y1: f32, x2: f32, y2: f32, x: f32, y: f32) {
-        self.path.push_integral_cubic_curve(IntegralCubicCurveSegment {
-            control_points: [[x1, y1].into(), [x2, y2].into(), [x, y].into()],
-        });
+        self.path
+            .push_integral_cubic_curve(IntegralCubicCurveSegment {
+                control_points: [[x1, y1].into(), [x2, y2].into(), [x, y].into()],
+            });
     }
 
     fn close(&mut self) {
@@ -233,25 +234,13 @@ macro_rules! calculate_aligned_positions {
 ///
 /// If a `clipping_area` convex polygon is given, then glyphs which are completely outside are discarded.
 /// Other glyphs will stay at the same position.
-pub fn paths_of_text(face: &ttf_parser::Face, layout: &Layout, text: &str, clipping_area: Option<&[ppga2d::Point]>) -> Vec<Path> {
+pub fn paths_of_text(face: &ttf_parser::Face, layout: &Layout, text: &str) -> Vec<Path> {
     let (_extent, _offset, lines) = calculate_aligned_positions!(face, layout, text);
     let scale = layout.size.unwrap() / face.height() as f32;
     let mut result = Vec::new();
-    for ([x, y], glyph_id) in lines
-        .iter()
-        .flat_map(|(_line_range_end, glyph_positions)| glyph_positions[0..glyph_positions.len() - 1].iter())
-    {
-        if let (Some(clipping_area), Some(glyph_bounding_box)) = (clipping_area, face.glyph_bounding_box(*glyph_id)) {
-            let aabb = [
-                (glyph_bounding_box.x_min as i64 + x) as f32 * scale,
-                (glyph_bounding_box.y_min as i64 + y) as f32 * scale,
-                (glyph_bounding_box.x_max as i64 + x) as f32 * scale,
-                (glyph_bounding_box.y_max as i64 + y) as f32 * scale,
-            ];
-            if !do_convex_polygons_overlap(&aabb_to_convex_polygon(&aabb), clipping_area) {
-                continue;
-            }
-        }
+    for ([x, y], glyph_id) in lines.iter().flat_map(|(_line_range_end, glyph_positions)| {
+        glyph_positions[0..glyph_positions.len() - 1].iter()
+    }) {
         let motor = translate2d([*x as f32 * scale, *y as f32 * scale]);
         let mut paths = paths_of_glyph(face, *glyph_id);
         for path in &mut paths {
@@ -290,7 +279,11 @@ impl TextGeometry {
         let (extent, offset, lines) = calculate_aligned_positions!(face, layout, text);
         Self {
             major_axis,
-            half_extent: [extent[0] as f32 * scale * 0.5, extent[1] as f32 * scale * 0.5].into(),
+            half_extent: [
+                extent[0] as f32 * scale * 0.5,
+                extent[1] as f32 * scale * 0.5,
+            ]
+            .into(),
             lines: lines
                 .iter()
                 .map(|(line_range_end, glyph_positions)| {
@@ -298,7 +291,13 @@ impl TextGeometry {
                         *line_range_end,
                         glyph_positions
                             .iter()
-                            .map(|(position, _glyph_id)| [(position[0] - offset[0]) as f32 * scale, (position[1] - offset[1]) as f32 * scale].into())
+                            .map(|(position, _glyph_id)| {
+                                [
+                                    (position[0] - offset[0]) as f32 * scale,
+                                    (position[1] - offset[1]) as f32 * scale,
+                                ]
+                                .into()
+                            })
                             .collect(),
                     )
                 })
@@ -318,20 +317,33 @@ impl TextGeometry {
     pub fn char_index_from_position(&self, cursor: SafeFloat<f32, 2>) -> usize {
         let cursor = cursor.unwrap();
         let minor_half_extent = self.half_extent.unwrap()[1 - self.major_axis];
-        let line_index = ((minor_half_extent - cursor[1 - self.major_axis]) * self.lines.len() as f32 / (minor_half_extent * 2.0))
+        let line_index = ((minor_half_extent - cursor[1 - self.major_axis])
+            * self.lines.len() as f32
+            / (minor_half_extent * 2.0))
             .max(0.0)
             .min((self.lines.len() - 1) as f32) as usize;
         let glyph_positions = &self.lines[line_index].1;
         glyph_positions
             .iter()
             .zip(glyph_positions.iter().skip(1))
-            .position(|(prev, next)| (prev.unwrap()[self.major_axis] + next.unwrap()[self.major_axis]) * 0.5 > cursor[self.major_axis])
+            .position(|(prev, next)| {
+                (prev.unwrap()[self.major_axis] + next.unwrap()[self.major_axis]) * 0.5
+                    > cursor[self.major_axis]
+            })
             .unwrap_or(glyph_positions.len() - 1)
-            + if line_index == 0 { 0 } else { self.lines[line_index - 1].0 }
+            + if line_index == 0 {
+                0
+            } else {
+                self.lines[line_index - 1].0
+            }
     }
 
     /// Used to jump into the previous or next line
-    pub fn advance_char_index_by_line_index(&self, char_index: usize, relative_line_index: isize) -> usize {
+    pub fn advance_char_index_by_line_index(
+        &self,
+        char_index: usize,
+        relative_line_index: isize,
+    ) -> usize {
         let line_index = self.line_index_from_char_index(char_index);
         if relative_line_index < 0 && line_index == 0 {
             return 0;
@@ -339,8 +351,10 @@ impl TextGeometry {
             return self.lines.last().unwrap().0 - 1;
         }
         let (line_range_end, glyph_positions) = &self.lines[line_index];
-        let mut cursor = glyph_positions[char_index + glyph_positions.len() - *line_range_end].unwrap();
-        let line_minor_extent = self.half_extent.unwrap()[1 - self.major_axis] * 2.0 / self.lines.len() as f32;
+        let mut cursor =
+            glyph_positions[char_index + glyph_positions.len() - *line_range_end].unwrap();
+        let line_minor_extent =
+            self.half_extent.unwrap()[1 - self.major_axis] * 2.0 / self.lines.len() as f32;
         cursor[1 - self.major_axis] -= line_minor_extent * relative_line_index as f32;
         self.char_index_from_position(cursor.into())
     }
@@ -348,5 +362,9 @@ impl TextGeometry {
 
 /// Calculates the byte offsets of chars in an UTF8 string
 pub fn byte_offset_of_char_index(string: &str, char_index: usize) -> usize {
-    string.char_indices().nth(char_index).map(|(index, _char)| index).unwrap_or(string.len())
+    string
+        .char_indices()
+        .nth(char_index)
+        .map(|(index, _char)| index)
+        .unwrap_or(string.len())
 }
