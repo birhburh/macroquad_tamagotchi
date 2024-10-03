@@ -4,10 +4,10 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-macroquad = { path = "../macroquad" }
-# macroquad = "0.4"
+# macroquad = { path = "../macroquad" }
+macroquad = "0.4"
 # miniquad = { git = "https://github.com/birhburh/miniquad", branch = "triangle_strip"}
-miniquad = { path = "../miniquad", features = ["log-impl"] }
+# miniquad = { path = "../miniquad", features = ["log-impl"] }
 
 geometric_algebra = "0.3.0"
 ttf-parser = { version = "0.14.0" }
@@ -23,5 +23,5 @@ serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 
 [patch.crates-io]
-miniquad = { path="../miniquad", features = ["log-impl"] }
+# miniquad = { path="../miniquad", features = ["log-impl"] }
 # miniquad = { git = "https://github.com/birhburh/miniquad", branch = "triangle_strip"}

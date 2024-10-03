@@ -18,7 +18,7 @@ pub mod raw_miniquad {
     use super::text::{paths_of_text, Alignment, Layout, Orientation};
     use super::vertex::{Vertex2f, Vertex3f, Vertex0};
     use super::OPEN_SANS_TTF;
-    use miniquad::*;
+    use macroquad::miniquad::*;
 
     pub struct Stage {
         pub fill_solid_pipeline: Pipeline,
@@ -374,7 +374,7 @@ pub mod raw_miniquad {
     }
 
     pub mod shader {
-        use miniquad::*;
+        use macroquad::miniquad::*;
 
         pub const FILL_VERTEX: &str = r#"#version 100
 precision lowp float;
