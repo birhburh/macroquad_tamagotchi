@@ -7,6 +7,7 @@ I try to use lottie animations in there. I wanted to use lottie-rs but there are
 # TODO:
 - fix metal shaders to do same things as glsl's
 - fix metal rendering by providing index_buffer
+- fix metall MSAA
 - nanoserde: use default instead of None when skip fields
 
 # Resources:

@@ -57,7 +57,7 @@ pub enum RenderOperation {
 
 /// A set of [Path]s which is always rendered together
 pub struct Shape {
-    pub vertex_offsets: [usize; 6],
+    pub vertex_offsets: [usize; 7],
     pub index_offsets: [usize; 1],
     pub vertex_buffer: Vec<u8>,
     pub index_buffer: Vec<u8>,
@@ -102,6 +102,18 @@ pub fn andrew(input_points: &[SafeFloat<f32, 2>]) -> Vec<[f32; 2]> {
     hull
 }
 
+#[repr(C)]
+struct Vec2 {
+    x: f32,
+    y: f32,
+}
+
+#[repr(C)]
+struct Vertex {
+    pos: Vec2,
+    uv: Vec2,
+}
+
 impl Shape {
     pub fn from_paths(paths: &[Path]) -> Result<Self, Error> {
         let mut proto_hull = Vec::new();
@@ -130,7 +142,33 @@ impl Shape {
                 convex_box[3] = point[1];
             }
         }
-        dbg!(convex_box);
+        dbg!(&convex_box);
+        let full_screen_texture: [Vertex; 6] = [
+            Vertex {
+                pos: Vec2 { x: -1.0, y: -1.0 },
+                uv: Vec2 { x: 0., y: 0. },
+            },
+            Vertex {
+                pos: Vec2 { x: 1., y: -1. },
+                uv: Vec2 { x: 1., y: 0. },
+            },
+            Vertex {
+                pos: Vec2 { x: 1., y: 1. },
+                uv: Vec2 { x: 1., y: 1. },
+            },
+            Vertex {
+                pos: Vec2 { x: -1.0, y: -1.0 },
+                uv: Vec2 { x: 0., y: 0. },
+            },
+            Vertex {
+                pos: Vec2 { x: 1.0, y: 1.0 },
+                uv: Vec2 { x: 1., y: 1. },
+            },
+            Vertex {
+                pos: Vec2 { x: -1.0, y: 1.0 },
+                uv: Vec2 { x: 0., y: 1. },
+            },
+        ];
         let (vertex_offsets, vertex_buffer) = concat_buffers!([
             &fill_builder.solid_vertices,
             &fill_builder.integral_quadratic_vertices,
@@ -138,6 +176,7 @@ impl Shape {
             &fill_builder.rational_quadratic_vertices,
             &fill_builder.rational_cubic_vertices,
             &convex_hull,
+            &full_screen_texture
         ]);
         let (index_offsets, index_buffer) = concat_buffers!([&fill_builder.solid_indices]);
 

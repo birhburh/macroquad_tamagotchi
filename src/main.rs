@@ -30,6 +30,27 @@ fn window_conf() -> Conf {
     }
 }
 
+// 6x subpixel AA pattern
+//
+//   R = (f(x - 2/3, y) + f(x - 1/3, y) + f(x, y)) / 3
+//   G = (f(x - 1/3, y) + f(x, y) + f(x + 1/3, y)) / 3
+//   B = (f(x, y) + f(x + 1/3, y) + f(x + 2/3, y)) / 3
+//
+// The shader would require three texture lookups if the texture format
+// stored data for offsets -1/3, 0, and +1/3 since the shader also needs
+// data for offsets -2/3 and +2/3. To avoid this, the texture format stores
+// data for offsets 0, +1/3, and +2/3 instead. That way the shader can get
+// data for offsets -2/3 and -1/3 with only one additional texture lookup.
+//
+const JITTER_PATTERN: [[f32; 2]; 6] = [
+    [-1. / 12.0, -5. / 12.0],
+    [ 1. / 12.0,  1. / 12.0],
+    [ 3. / 12.0, -1. / 12.0],
+    [ 5. / 12.0,  5. / 12.0],
+    [ 7. / 12.0, -3. / 12.0],
+    [ 9. / 12.0,  3. / 12.0],
+];
+
 #[macroquad::main(window_conf)]
 async fn main() {
     // let model = nanolottie::load_lottie_file(false);
@@ -66,6 +87,7 @@ async fn main() {
         if offscreen_width != screen_width() as u32 && offscreen_height != screen_height() as u32 {
             offscreen_width = screen_width() as u32;
             offscreen_height = screen_height() as u32;
+            dbg!((offscreen_width, offscreen_height));
             offscreen_pass = {
                 let InternalGlContext {
                     quad_context: ctx, ..
@@ -76,6 +98,7 @@ async fn main() {
                     format: TextureFormat::RGBA8,
                     ..Default::default()
                 });
+                stage.color_cover_bindings.images[0] = color_img;
 
                 let new_offscreen_pass = ctx.new_render_pass(color_img, None);
 
@@ -133,7 +156,7 @@ async fn main() {
                     std::mem::size_of::<Vertex3f>(),
                 ),
             ] {
-                for j in 0..1 {
+                for j in 0..JITTER_PATTERN.len() {
                     gl.quad_context.apply_pipeline(pipeline);
                     gl.quad_context.apply_bindings(bindings);
                     let mut in_color = [0.0; 4];
@@ -181,9 +204,9 @@ async fn main() {
                     },
                 ));
 
-            let begin_offset = stage.shape2.vertex_offsets[4];
-            let end_offset = stage.shape2.vertex_offsets[5];
-            let vertex_size = std::mem::size_of::<Vertex0>();
+            let begin_offset = stage.shape2.vertex_offsets[5];
+            let end_offset = stage.shape2.vertex_offsets[6];
+            let vertex_size = std::mem::size_of::<Vertex2f>();
             gl.quad_context.draw(
                 0,
                 ((end_offset - begin_offset) / vertex_size)
