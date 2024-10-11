@@ -8,6 +8,7 @@ use {
         GeometricProduct, One,
     },
     macroquad::prelude::*,
+    miniquad::{PassAction, TextureFormat, TextureParams},
     path_rendering::{
         raw_miniquad,
         utils::{matrix_multiplication, motor3d_to_mat4, perspective_projection},
@@ -34,7 +35,7 @@ async fn main() {
     // let model = nanolottie::load_lottie_file(false);
     // dbg!(&model);
 
-    let stage = {
+    let mut stage = {
         let InternalGlContext {
             quad_context: ctx, ..
         } = unsafe { get_internal_gl() };
@@ -42,8 +43,46 @@ async fn main() {
         raw_miniquad::Stage::new(ctx)
     };
 
+    let mut offscreen_width = 0;
+    let mut offscreen_height = 0;
+    let mut offscreen_pass = {
+        let InternalGlContext {
+            quad_context: ctx, ..
+        } = unsafe { get_internal_gl() };
+
+        let color_img = ctx.new_render_texture(TextureParams {
+            width: offscreen_width,
+            height: offscreen_height,
+            format: TextureFormat::RGBA8,
+            ..Default::default()
+        });
+        stage.color_cover_bindings.images[0] = color_img;
+        ctx.new_render_pass(color_img, None)
+    };
+
     loop {
-        clear_background(LIGHTGRAY);
+        clear_background(DARKGRAY);
+
+        if offscreen_width != screen_width() as u32 && offscreen_height != screen_height() as u32 {
+            offscreen_width = screen_width() as u32;
+            offscreen_height = screen_height() as u32;
+            offscreen_pass = {
+                let InternalGlContext {
+                    quad_context: ctx, ..
+                } = unsafe { get_internal_gl() };
+                let color_img = ctx.new_render_texture(TextureParams {
+                    width: offscreen_width,
+                    height: offscreen_height,
+                    format: TextureFormat::RGBA8,
+                    ..Default::default()
+                });
+
+                let new_offscreen_pass = ctx.new_render_pass(color_img, None);
+
+                ctx.delete_render_pass(offscreen_pass);
+                new_offscreen_pass
+            };
+        }
 
         // draw_lottie(&model);
 
@@ -53,13 +92,12 @@ async fn main() {
             // Ensure that macroquad's shapes are not going to be lost
             gl.flush();
 
-            gl.quad_context
-                .begin_default_pass(miniquad::PassAction::Clear {
-                    stencil: Some(0),
-                    color: Default::default(),
-                    depth: Default::default(),
-                });
-
+            // gl.quad_context
+            //     .begin_default_pass(PassAction::Nothing);
+            gl.quad_context.begin_pass(
+                Some(offscreen_pass),
+                PassAction::clear_color(0.0, 0.0, 0.0, 0.0),
+            );
             let projection_matrix = matrix_multiplication(
                 &perspective_projection(
                     std::f32::consts::PI * 0.5,
@@ -72,92 +110,74 @@ async fn main() {
                 ),
             );
 
-            gl.quad_context.apply_pipeline(&stage.fill_solid_pipeline);
-            gl.quad_context.apply_bindings(&stage.fill_solid_bindings);
+            for (pipeline, bindings, begin_offset, end_offset, vertex_size) in [
+                (
+                    &stage.fill_solid_pipeline,
+                    &stage.fill_solid_bindings,
+                    0,
+                    stage.shape2.vertex_offsets[0],
+                    std::mem::size_of::<Vertex0>(),
+                ),
+                (
+                    &stage.fill_integral_quadratic_curve_pipeline,
+                    &stage.fill_integral_quadratic_curve_bindings,
+                    stage.shape2.vertex_offsets[0],
+                    stage.shape2.vertex_offsets[1],
+                    std::mem::size_of::<Vertex2f>(),
+                ),
+                (
+                    &stage.fill_rational_quadratic_curve_pipeline,
+                    &stage.fill_rational_quadratic_curve_bindings,
+                    stage.shape2.vertex_offsets[2],
+                    stage.shape2.vertex_offsets[3],
+                    std::mem::size_of::<Vertex3f>(),
+                ),
+            ] {
+                for j in 0..1 {
+                    gl.quad_context.apply_pipeline(pipeline);
+                    gl.quad_context.apply_bindings(bindings);
+                    let mut in_color = [0.0; 4];
+
+                    if j % 2 == 0 {
+                        in_color[0] = if j == 0 { 1.0 } else { 0.0 };
+                        in_color[1] = if j == 2 { 1.0 } else { 0.0 };
+                        in_color[2] = if j == 4 { 1.0 } else { 0.0 };
+                    }
+                    gl.quad_context
+                        .apply_uniforms(miniquad::UniformsSource::table(
+                            &raw_miniquad::shader::Uniforms {
+                                transform_row_0: projection_matrix[0].into(),
+                                transform_row_1: projection_matrix[1].into(),
+                                transform_row_2: projection_matrix[2].into(),
+                                transform_row_3: projection_matrix[3].into(),
+                                in_color,
+                            },
+                        ));
+
+                    gl.quad_context.draw(
+                        0,
+                        ((end_offset - begin_offset) / vertex_size)
+                            .try_into()
+                            .unwrap(),
+                        1,
+                    );
+                }
+            }
+            gl.quad_context.end_render_pass();
+
+            gl.quad_context.begin_default_pass(PassAction::Nothing);
+
+            gl.quad_context.apply_pipeline(&stage.color_cover_pipeline);
+            gl.quad_context.apply_bindings(&stage.color_cover_bindings);
 
             gl.quad_context
                 .apply_uniforms(miniquad::UniformsSource::table(
-                    &raw_miniquad::shader::Uniforms {
+                    &raw_miniquad::shader::CoverUniforms {
                         transform_row_0: projection_matrix[0].into(),
                         transform_row_1: projection_matrix[1].into(),
                         transform_row_2: projection_matrix[2].into(),
                         transform_row_3: projection_matrix[3].into(),
-                    },
-                ));
-
-            gl.quad_context.draw(
-                0,
-                (stage.shape2.index_offsets[0] / std::mem::size_of::<u16>())
-                    .try_into()
-                    .unwrap(),
-                1,
-            );
-
-            gl.quad_context
-                .apply_pipeline(&stage.fill_integral_quadratic_curve_pipeline);
-            gl.quad_context
-                .apply_bindings(&stage.fill_integral_quadratic_curve_bindings);
-
-            gl.quad_context
-                .apply_uniforms(miniquad::UniformsSource::table(
-                    &raw_miniquad::shader::Uniforms {
-                        transform_row_0: projection_matrix[0].into(),
-                        transform_row_1: projection_matrix[1].into(),
-                        transform_row_2: projection_matrix[2].into(),
-                        transform_row_3: projection_matrix[3].into(),
-                    },
-                ));
-
-            let begin_offset = stage.shape2.vertex_offsets[0];
-            let end_offset = stage.shape2.vertex_offsets[1];
-            let vertex_size = std::mem::size_of::<Vertex2f>();
-            gl.quad_context.draw(
-                0,
-                ((end_offset - begin_offset) / vertex_size)
-                    .try_into()
-                    .unwrap(),
-                1,
-            );
-
-            gl.quad_context
-                .apply_pipeline(&stage.fill_rational_quadratic_curve_pipeline);
-            gl.quad_context
-                .apply_bindings(&stage.fill_rational_quadratic_curve_bindings);
-
-            gl.quad_context
-                .apply_uniforms(miniquad::UniformsSource::table(
-                    &raw_miniquad::shader::Uniforms {
-                        transform_row_0: projection_matrix[0].into(),
-                        transform_row_1: projection_matrix[1].into(),
-                        transform_row_2: projection_matrix[2].into(),
-                        transform_row_3: projection_matrix[3].into(),
-                    },
-                ));
-
-            let begin_offset = stage.shape2.vertex_offsets[2];
-            let end_offset = stage.shape2.vertex_offsets[3];
-            let vertex_size = std::mem::size_of::<Vertex3f>();
-            gl.quad_context.draw(
-                0,
-                ((end_offset - begin_offset) / vertex_size)
-                    .try_into()
-                    .unwrap(),
-                1,
-            );
-
-            gl.quad_context
-                .apply_pipeline(&stage.color_cover_pipeline);
-            gl.quad_context
-                .apply_bindings(&stage.color_cover_bindings);
-
-            gl.quad_context
-                .apply_uniforms(miniquad::UniformsSource::table(
-                    &raw_miniquad::shader::UniformsWithColor {
-                        transform_row_0: projection_matrix[0].into(),
-                        transform_row_1: projection_matrix[1].into(),
-                        transform_row_2: projection_matrix[2].into(),
-                        transform_row_3: projection_matrix[3].into(),
-                        in_color: [0.1, 0.5, 0.2, 1.0],
+                        in_color: [0.0; 4],
                     },
                 ));
 

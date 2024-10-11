@@ -110,6 +110,27 @@ impl Shape {
             fill_builder.add_path(&mut proto_hull, path)?;
         }
         let convex_hull = triangle_fan_to_triangles(andrew(&proto_hull));
+        let mut convex_box = vec![
+            convex_hull[0][0],
+            convex_hull[0][1],
+            convex_hull[0][0],
+            convex_hull[0][1],
+        ];
+        for point in &convex_hull {
+            if point[0] < convex_box[0] {
+                convex_box[0] = point[0];
+            }
+            if point[0] > convex_box[2] {
+                convex_box[2] = point[0];
+            }
+            if point[1] < convex_box[1] {
+                convex_box[1] = point[1];
+            }
+            if point[1] > convex_box[3] {
+                convex_box[3] = point[1];
+            }
+        }
+        dbg!(convex_box);
         let (vertex_offsets, vertex_buffer) = concat_buffers!([
             &fill_builder.solid_vertices,
             &fill_builder.integral_quadratic_vertices,
@@ -118,7 +139,6 @@ impl Shape {
             &fill_builder.rational_cubic_vertices,
             &convex_hull,
         ]);
-        dbg!(convex_hull);
         let (index_offsets, index_buffer) = concat_buffers!([&fill_builder.solid_indices]);
 
         Ok(Self {

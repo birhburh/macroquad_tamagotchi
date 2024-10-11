@@ -16,7 +16,7 @@ const OPEN_SANS_TTF: &[u8] = include_bytes!("../fonts/OpenSans-Regular.ttf");
 pub mod raw_miniquad {
     use super::renderer::Shape;
     use super::text::{paths_of_text, Alignment, Layout, Orientation};
-    use super::vertex::{Vertex2f, Vertex3f, Vertex0};
+    use super::vertex::{Vertex0, Vertex2f, Vertex3f};
     use super::OPEN_SANS_TTF;
     use macroquad::miniquad::*;
 
@@ -44,7 +44,7 @@ pub mod raw_miniquad {
                     minor_alignment: Alignment::Center,
                 },
                 "WHO",
-                // "T",
+                // "Hego",
                 // "H",
                 // "HW",
                 // "Hello World",
@@ -57,232 +57,114 @@ pub mod raw_miniquad {
 
             // let shape2 = Shape::from_paths(&vec![Path::from_circle([0.0, 0.0], 0.5)]).unwrap();
 
-            let vertices = &shape2.vertex_buffer[0..shape2.vertex_offsets[0] as usize];
-            let vertex_buffer = ctx.new_buffer(
-                BufferType::VertexBuffer,
-                BufferUsage::Immutable,
-                BufferSource::slice(&vertices),
-            );
+            let mut fill_solid_pipeline = None;
+            let mut fill_solid_bindings = None;
+            let mut fill_integral_quadratic_curve_pipeline = None;
+            let mut fill_integral_quadratic_curve_bindings = None;
+            let mut fill_rational_quadratic_curve_pipeline = None;
+            let mut fill_rational_quadratic_curve_bindings = None;
+            for (
+                begin_offset,
+                end_offset,
+                vertex_size,
+                vertex_shader,
+                fragment_shader,
+                metal_shader,
+                attributes,
+                pipeline,
+                bindings,
+            ) in [
+                (
+                    0,
+                    shape2.vertex_offsets[0],
+                    std::mem::size_of::<Vertex0>(),
+                    shader::FILL_VERTEX,
+                    shader::FILL_FRAGMENT,
+                    shader::FILL_METAL,
+                    vec![VertexAttribute::new("position", VertexFormat::Float2)],
+                    &mut fill_solid_pipeline,
+                    &mut fill_solid_bindings,
+                ),
+                (
+                    shape2.vertex_offsets[0],
+                    shape2.vertex_offsets[1],
+                    std::mem::size_of::<Vertex2f>(),
+                    shader::INTEGRAL_QUADRATIC_VERTEX,
+                    shader::INTEGRAL_QUADRATIC_FRAGMENT,
+                    shader::INTEGRAL_QUADRATIC_METAL,
+                    vec![
+                        VertexAttribute::new("position", VertexFormat::Float2),
+                        VertexAttribute::new("in_weights", VertexFormat::Float2),
+                    ],
+                    &mut fill_integral_quadratic_curve_pipeline,
+                    &mut fill_integral_quadratic_curve_bindings,
+                ),
+                (
+                    shape2.vertex_offsets[2],
+                    shape2.vertex_offsets[3],
+                    std::mem::size_of::<Vertex3f>(),
+                    shader::QUADRATIC_VERTEX,
+                    shader::QUADRATIC_FRAGMENT,
+                    shader::QUADRATIC_METAL,
+                    vec![
+                        VertexAttribute::new("position", VertexFormat::Float2),
+                        VertexAttribute::new("in_weights", VertexFormat::Float3),
+                    ],
+                    &mut fill_rational_quadratic_curve_pipeline,
+                    &mut fill_rational_quadratic_curve_bindings,
+                ),
+            ] {
+                let vertices = &shape2.vertex_buffer[begin_offset..end_offset];
+                let vertex_buffer = ctx.new_buffer(
+                    BufferType::VertexBuffer,
+                    BufferUsage::Immutable,
+                    BufferSource::slice(&vertices),
+                );
+                let indices: Vec<u16> =
+                    (0..((end_offset - begin_offset) / vertex_size) as u16).collect();
 
-            let indices = &shape2.index_buffer[0..shape2.index_offsets[0] as usize];
-            let ptr = indices.as_ptr() as *const u16;
-            let len = std::mem::size_of_val(indices) / std::mem::size_of::<u16>();
-            let indices = unsafe { std::slice::from_raw_parts(ptr, len) };
+                let index_buffer = ctx.new_buffer(
+                    BufferType::IndexBuffer,
+                    BufferUsage::Immutable,
+                    BufferSource::slice(&indices),
+                );
 
-            let index_buffer = ctx.new_buffer(
-                BufferType::IndexBuffer,
-                BufferUsage::Immutable,
-                BufferSource::slice(indices),
-            );
+                *bindings = Some(Bindings {
+                    vertex_buffers: vec![vertex_buffer],
+                    index_buffer,
+                    images: vec![],
+                });
 
-            let fill_solid_bindings = Bindings {
-                vertex_buffers: vec![vertex_buffer],
-                index_buffer,
-                images: vec![],
-            };
-
-            let fill_solid_shader = ctx
-                .new_shader(
-                    match ctx.info().backend {
-                        Backend::OpenGl => ShaderSource::Glsl {
-                            vertex: shader::FILL_VERTEX,
-                            fragment: shader::FILL_FRAGMENT,
+                let shader = ctx
+                    .new_shader(
+                        match ctx.info().backend {
+                            Backend::OpenGl => ShaderSource::Glsl {
+                                vertex: vertex_shader,
+                                fragment: fragment_shader,
+                            },
+                            Backend::Metal => ShaderSource::Msl {
+                                program: metal_shader,
+                            },
                         },
-                        Backend::Metal => ShaderSource::Msl {
-                            program: shader::FILL_METAL,
-                        },
+                        shader::meta(),
+                    )
+                    .unwrap();
+
+                *pipeline = Some(ctx.new_pipeline(
+                    &[BufferLayout::default()],
+                    &attributes,
+                    shader,
+                    PipelineParams {
+                        primitive_type: PrimitiveType::Triangles,
+                        color_blend: Some(BlendState::new(
+                            Equation::Add,
+                            BlendFactor::One,
+                            BlendFactor::One,
+                        )),
+                        ..Default::default()
                     },
-                    shader::meta(),
-                )
-                .unwrap();
-
-            let fill_solid_pipeline = ctx.new_pipeline(
-                &[BufferLayout::default()],
-                &[VertexAttribute::new("position", VertexFormat::Float2)],
-                fill_solid_shader,
-                PipelineParams {
-                    primitive_type: PrimitiveType::Triangles,
-                    stencil_test: Some(StencilState {
-                        front: StencilFaceState {
-                            test_func: CompareFunc::LessOrEqual,
-                            fail_op: StencilOp::Keep,
-                            depth_fail_op: StencilOp::Keep,
-                            pass_op: StencilOp::Invert,
-                            test_ref: 0,
-                            test_mask: 1,
-                            write_mask: 1,
-                        },
-                        back: StencilFaceState {
-                            test_func: CompareFunc::LessOrEqual,
-                            fail_op: StencilOp::Keep,
-                            depth_fail_op: StencilOp::Keep,
-                            pass_op: StencilOp::Invert,
-                            test_ref: 0,
-                            test_mask: 1,
-                            write_mask: 1,
-                        },
-                    }),
-                    color_write: (false, false, false, false),
-                    ..Default::default()
-                },
-            );
-
-            let begin_offset: usize = shape2.vertex_offsets[0];
-            let end_offset = shape2.vertex_offsets[1];
-            let vertices = &shape2.vertex_buffer[begin_offset..end_offset];
-            let vertex_buffer = ctx.new_buffer(
-                BufferType::VertexBuffer,
-                BufferUsage::Immutable,
-                BufferSource::slice(vertices),
-            );
-
-            let vertex_size = std::mem::size_of::<Vertex2f>();
-            let indices: Vec<u16> =
-                (0..((end_offset - begin_offset) / vertex_size) as u16).collect();
-
-            let index_buffer = ctx.new_buffer(
-                BufferType::IndexBuffer,
-                BufferUsage::Immutable,
-                BufferSource::slice(&indices),
-            );
-
-            let fill_integral_quadratic_curve_bindings = Bindings {
-                vertex_buffers: vec![vertex_buffer],
-                index_buffer,
-                images: vec![],
-            };
-            let fill_integral_quadratic_curve_shader = ctx
-                .new_shader(
-                    match ctx.info().backend {
-                        Backend::OpenGl => ShaderSource::Glsl {
-                            vertex: shader::INTEGRAL_QUADRATIC_VERTEX,
-                            fragment: shader::INTEGRAL_QUADRATIC_FRAGMENT,
-                        },
-                        Backend::Metal => ShaderSource::Msl {
-                            program: shader::INTEGRAL_QUADRATIC_METAL,
-                        },
-                    },
-                    shader::meta(),
-                )
-                .unwrap();
-
-            let fill_integral_quadratic_curve_pipeline = ctx.new_pipeline(
-                &[BufferLayout::default()],
-                &[
-                    VertexAttribute::new("position", VertexFormat::Float2),
-                    VertexAttribute::new("in_weights", VertexFormat::Float2),
-                ],
-                fill_integral_quadratic_curve_shader,
-                PipelineParams {
-                    primitive_type: PrimitiveType::Triangles,
-                    stencil_test: Some(StencilState {
-                        front: StencilFaceState {
-                            test_func: CompareFunc::LessOrEqual,
-                            fail_op: StencilOp::Keep,
-                            depth_fail_op: StencilOp::Keep,
-                            pass_op: StencilOp::Invert,
-                            test_ref: 0,
-                            test_mask: 1,
-                            write_mask: 1,
-                        },
-                        back: StencilFaceState {
-                            test_func: CompareFunc::LessOrEqual,
-                            fail_op: StencilOp::Keep,
-                            depth_fail_op: StencilOp::Keep,
-                            pass_op: StencilOp::Invert,
-                            test_ref: 0,
-                            test_mask: 1,
-                            write_mask: 1,
-                        },
-                    }),
-                    color_write: (false, false, false, false),
-                    color_blend: Some(BlendState::new(
-                        Equation::Add,
-                        BlendFactor::Value(BlendValue::SourceAlpha),
-                        BlendFactor::OneMinusValue(BlendValue::SourceAlpha),
-                    )),
-                    ..Default::default()
-                },
-            );
-
-
-            let begin_offset: usize = shape2.vertex_offsets[2];
-            let end_offset = shape2.vertex_offsets[3];
-            let vertices = &shape2.vertex_buffer[begin_offset..end_offset];
-            let vertex_buffer = ctx.new_buffer(
-                BufferType::VertexBuffer,
-                BufferUsage::Immutable,
-                BufferSource::slice(vertices),
-            );
-
-            let vertex_size = std::mem::size_of::<Vertex3f>();
-            let indices: Vec<u16> =
-                (0..((end_offset - begin_offset) / vertex_size) as u16).collect();
-
-            let index_buffer = ctx.new_buffer(
-                BufferType::IndexBuffer,
-                BufferUsage::Immutable,
-                BufferSource::slice(&indices),
-            );
-
-            let fill_rational_quadratic_curve_bindings = Bindings {
-                vertex_buffers: vec![vertex_buffer],
-                index_buffer,
-                images: vec![],
-            };
-            let fill_rational_quadratic_curve_shader = ctx
-                .new_shader(
-                    match ctx.info().backend {
-                        Backend::OpenGl => ShaderSource::Glsl {
-                            vertex: shader::QUADRATIC_VERTEX,
-                            fragment: shader::QUADRATIC_FRAGMENT,
-                        },
-                        Backend::Metal => ShaderSource::Msl {
-                            program: shader::QUADRATIC_METAL,
-                        },
-                    },
-                    shader::meta(),
-                )
-                .unwrap();
-
-            let fill_rational_quadratic_curve_pipeline = ctx.new_pipeline(
-                &[BufferLayout::default()],
-                &[
-                    VertexAttribute::new("position", VertexFormat::Float2),
-                    VertexAttribute::new("in_weights", VertexFormat::Float3),
-                ],
-                fill_rational_quadratic_curve_shader,
-                PipelineParams {
-                    primitive_type: PrimitiveType::Triangles,
-                    stencil_test: Some(StencilState {
-                        front: StencilFaceState {
-                            test_func: CompareFunc::LessOrEqual,
-                            fail_op: StencilOp::Keep,
-                            depth_fail_op: StencilOp::Keep,
-                            pass_op: StencilOp::Invert,
-                            test_ref: 0,
-                            test_mask: 1,
-                            write_mask: 1,
-                        },
-                        back: StencilFaceState {
-                            test_func: CompareFunc::LessOrEqual,
-                            fail_op: StencilOp::Keep,
-                            depth_fail_op: StencilOp::Keep,
-                            pass_op: StencilOp::Invert,
-                            test_ref: 0,
-                            test_mask: 1,
-                            write_mask: 1,
-                        },
-                    }),
-                    color_write: (false, false, false, false),
-                    color_blend: Some(BlendState::new(
-                        Equation::Add,
-                        BlendFactor::Value(BlendValue::SourceAlpha),
-                        BlendFactor::OneMinusValue(BlendValue::SourceAlpha),
-                    )),
-                    ..Default::default()
-                },
-            );
+                ));
+            }
 
             let begin_offset: usize = shape2.vertex_offsets[4];
             let end_offset = shape2.vertex_offsets[5];
@@ -303,10 +185,16 @@ pub mod raw_miniquad {
                 BufferSource::slice(&indices),
             );
 
+            let color_img = ctx.new_render_texture(TextureParams {
+                width: 0,
+                height: 0,
+                format: TextureFormat::RGBA8,
+                ..Default::default()
+            });
             let color_cover_bindings = Bindings {
                 vertex_buffers: vec![vertex_buffer],
                 index_buffer,
-                images: vec![],
+                images: vec![color_img],
             };
             let color_cover_shader = ctx
                 .new_shader(
@@ -319,46 +207,34 @@ pub mod raw_miniquad {
                             program: shader::COVER_METAL,
                         },
                     },
-                    shader::meta_with_color(),
+                    shader::cover_meta(),
                 )
                 .unwrap();
             let color_cover_pipeline = ctx.new_pipeline(
                 &[BufferLayout::default()],
-                &[
-                    VertexAttribute::new("position", VertexFormat::Float2),
-                ],
+                &[VertexAttribute::new("position", VertexFormat::Float2)],
                 color_cover_shader,
                 PipelineParams {
                     primitive_type: PrimitiveType::Triangles,
-                    stencil_test: Some(StencilState {
-                        front: StencilFaceState {
-                            test_func: CompareFunc::Less,
-                            fail_op: StencilOp::Zero,
-                            depth_fail_op: StencilOp::Keep,
-                            pass_op: StencilOp::Zero,
-                            test_ref: 0,
-                            test_mask: 1,
-                            write_mask: 1,
-                        },
-                        back: StencilFaceState {
-                            test_func: CompareFunc::Less,
-                            fail_op: StencilOp::Zero,
-                            depth_fail_op: StencilOp::Keep,
-                            pass_op: StencilOp::Zero,
-                            test_ref: 0,
-                            test_mask: 1,
-                            write_mask: 1,
-                        },
-                    }),
-                    color_blend: Some(BlendState::new(
-                        Equation::Add,
-                        BlendFactor::Value(BlendValue::SourceAlpha),
-                        BlendFactor::OneMinusValue(BlendValue::SourceAlpha),
-                    )),
+                    // color_blend: Some(BlendState::new(
+                    //     Equation::Add,
+                    //     BlendFactor::Zero,
+                    //     BlendFactor::Value(BlendValue::SourceColor),
+                    // )),
                     ..Default::default()
                 },
             );
 
+            let fill_solid_pipeline = fill_solid_pipeline.unwrap();
+            let fill_solid_bindings = fill_solid_bindings.unwrap();
+            let fill_integral_quadratic_curve_pipeline =
+                fill_integral_quadratic_curve_pipeline.unwrap();
+            let fill_integral_quadratic_curve_bindings =
+                fill_integral_quadratic_curve_bindings.unwrap();
+            let fill_rational_quadratic_curve_pipeline =
+                fill_rational_quadratic_curve_pipeline.unwrap();
+            let fill_rational_quadratic_curve_bindings =
+                fill_rational_quadratic_curve_bindings.unwrap();
             Stage {
                 fill_solid_pipeline,
                 fill_solid_bindings,
@@ -394,8 +270,11 @@ void main() {
 "#;
 
         pub const FILL_FRAGMENT: &str = r#"#version 100
+precision lowp float;
+uniform vec4 in_color;
+
 void main() {
-    gl_FragColor = vec4(0.1, 0.5, 0.2, 1.0);
+    gl_FragColor = in_color * (gl_FrontFacing ? 16.0 / 255.0 : 1.0 / 255.0);
 }"#;
 
         pub const FILL_METAL: &str = r#"
@@ -440,7 +319,7 @@ void main() {
     }
 "#;
 
-pub const QUADRATIC_VERTEX: &str = r#"#version 100
+        pub const QUADRATIC_VERTEX: &str = r#"#version 100
 precision lowp float;
 
 uniform vec4 transform_row_0;
@@ -463,19 +342,15 @@ void main() {
 
         pub const QUADRATIC_FRAGMENT: &str = r#"#version 100
 precision lowp float;
-varying vec3 weights;
 
-vec4 coverage(bool keep) {
-    if (keep)
-        return vec4(0.1, 0.5, 0.2, 1.0);
-    else
-        // return vec4(0.0);
-        // return vec4(0.1, 0.5, 0.2, 0.5);
-        discard;
-}
+varying vec3 weights;
+uniform vec4 in_color;
 
 void main() {
-    gl_FragColor = coverage((weights.x * weights.x - weights.y * weights.z) <= 0.0);
+    if ((weights.x * weights.x - weights.y * weights.z) <= 0.0)
+        gl_FragColor = in_color * (gl_FrontFacing ? 16.0 / 255.0 : 1.0 / 255.0);
+    else
+        discard;
 }"#;
 
         pub const QUADRATIC_METAL: &str = r#"
@@ -489,6 +364,7 @@ void main() {
         float4 transform_row_1;
         float4 transform_row_2;
         float4 transform_row_3;
+        float4 in_color;
     };
 
     struct Vertex
@@ -552,17 +428,13 @@ void main() {
 precision lowp float;
 varying vec2 weights;
 
-vec4 coverage(bool keep) {
-    if (keep)
-        return vec4(0.1, 0.5, 0.2, 1.0);
-    else
-        // return vec4(0.0);
-        // return vec4(0.1, 0.5, 0.2, 0.5);
-        discard;
-}
+uniform vec4 in_color;
 
 void main() {
-    gl_FragColor = coverage((weights.x * weights.x - weights.y) <= 0.0);
+    if ((weights.x * weights.x - weights.y) <= 0.0)
+        gl_FragColor = in_color * (gl_FrontFacing ? 16.0 / 255.0 : 1.0 / 255.0);
+    else
+        discard;
 }"#;
 
         pub const INTEGRAL_QUADRATIC_METAL: &str = r#"
@@ -576,6 +448,7 @@ void main() {
         float4 transform_row_1;
         float4 transform_row_2;
         float4 transform_row_3;
+        float4 in_color;
     };
 
     struct Vertex
@@ -613,6 +486,29 @@ void main() {
         return coverage((in.weights.x * in.weights.x - in.weights.y) <= 0.0);
     }
 "#;
+        pub fn meta() -> ShaderMeta {
+            ShaderMeta {
+                images: vec![],
+                uniforms: UniformBlockLayout {
+                    uniforms: vec![
+                        UniformDesc::new("transform_row_0", UniformType::Float4),
+                        UniformDesc::new("transform_row_1", UniformType::Float4),
+                        UniformDesc::new("transform_row_2", UniformType::Float4),
+                        UniformDesc::new("transform_row_3", UniformType::Float4),
+                        UniformDesc::new("in_color", UniformType::Float4),
+                    ],
+                },
+            }
+        }
+
+        #[repr(C)]
+        pub struct Uniforms {
+            pub transform_row_0: [f32; 4],
+            pub transform_row_1: [f32; 4],
+            pub transform_row_2: [f32; 4],
+            pub transform_row_3: [f32; 4],
+            pub in_color: [f32; 4],
+        }
 
         pub const COVER_VERTEX: &str = r#"#version 100
 precision lowp float;
@@ -621,26 +517,54 @@ uniform vec4 transform_row_0;
 uniform vec4 transform_row_1;
 uniform vec4 transform_row_2;
 uniform vec4 transform_row_3;
-uniform vec4 in_color;
 
 attribute vec2 position;
-
-varying vec4 color;
 
 void main() {
     mat4 instance = mat4(transform_row_0, transform_row_1,
                          transform_row_2, transform_row_3);
     gl_Position = instance * vec4(position, 0.0, 1.0);
-    color = in_color;
 }
 "#;
 
         pub const COVER_FRAGMENT: &str = r#"#version 100
 precision lowp float;
-varying vec4 color;
+
+uniform vec4 transform_row_0;
+uniform vec4 transform_row_1;
+uniform vec4 transform_row_2;
+uniform vec4 transform_row_3;
+uniform vec4 in_color;
+uniform sampler2D tex;
 
 void main() {
-    gl_FragColor = color;
+    mat4 instance = mat4(transform_row_0, transform_row_1,
+                         transform_row_2, transform_row_3);
+    vec4 _coord2 = instance * vec4(gl_FragCoord.xy, 0.0, 1.0);
+
+	// Get samples for -2/3 and -1/3
+	vec2 valueL = texture2D(tex, vec2(_coord2.x, _coord2.y)).yz * 255.0;
+	vec2 lowerL = mod(valueL, 16.0);
+	vec2 upperL = (valueL - lowerL) / 16.0;
+	vec2 alphaL = min(abs(upperL - lowerL), 2.0);
+
+	// Get samples for 0, +1/3, and +2/3
+	vec3 valueR = texture2D(tex, _coord2.xy).xyz * 255.0;
+	vec3 lowerR = mod(valueR, 16.0);
+	vec3 upperR = (valueR - lowerR) / 16.0;
+	vec3 alphaR = min(abs(upperR - lowerR), 2.0);
+
+	// Average the energy over the pixels on either side
+	vec4 rgba = vec4(
+		(alphaR.x + alphaR.y + alphaR.z) / 6.0,
+		(alphaL.y + alphaR.x + alphaR.y) / 6.0,
+		(alphaL.x + alphaL.y + alphaR.x) / 6.0,
+		0.0);
+
+	// Optionally scale by a color
+	// gl_FragColor = 1.0 - rgba;
+	gl_FragColor = vec4(gl_FragCoord.x / 800.0, gl_FragCoord.y / 600.0, 0.0, 1.0);
+	// gl_FragColor = texture2D(tex, gl_FragCoord.xy) * 255.0;
 }"#;
 
         pub const COVER_METAL: &str = r#"
@@ -688,31 +612,9 @@ void main() {
     }
 "#;
 
-        pub fn meta() -> ShaderMeta {
+        pub fn cover_meta() -> ShaderMeta {
             ShaderMeta {
-                images: vec![],
-                uniforms: UniformBlockLayout {
-                    uniforms: vec![
-                        UniformDesc::new("transform_row_0", UniformType::Float4),
-                        UniformDesc::new("transform_row_1", UniformType::Float4),
-                        UniformDesc::new("transform_row_2", UniformType::Float4),
-                        UniformDesc::new("transform_row_3", UniformType::Float4),
-                    ],
-                },
-            }
-        }
-
-        #[repr(C)]
-        pub struct Uniforms {
-            pub transform_row_0: [f32; 4],
-            pub transform_row_1: [f32; 4],
-            pub transform_row_2: [f32; 4],
-            pub transform_row_3: [f32; 4],
-        }
-
-        pub fn meta_with_color() -> ShaderMeta {
-            ShaderMeta {
-                images: vec![],
+                images: vec!["tex".to_string()],
                 uniforms: UniformBlockLayout {
                     uniforms: vec![
                         UniformDesc::new("transform_row_0", UniformType::Float4),
@@ -726,7 +628,7 @@ void main() {
         }
 
         #[repr(C)]
-        pub struct UniformsWithColor {
+        pub struct CoverUniforms {
             pub transform_row_0: [f32; 4],
             pub transform_row_1: [f32; 4],
             pub transform_row_2: [f32; 4],

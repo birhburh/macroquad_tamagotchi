@@ -21,8 +21,6 @@ pub struct Vertex3f1i(pub [f32; 2], pub [f32; 3], pub u32);
 pub struct Vertex4f(pub [f32; 2], pub [f32; 4]);
 
 pub fn triangle_fan_to_triangles<T: Copy + std::fmt::Debug>(vertices: Vec<T>) -> Vec<T> {
-    dbg!(&vertices);
-    dbg!(vertices.len());
     // vertices order:
     // 0 1 2 3
     // new order:
@@ -40,7 +38,6 @@ pub fn triangle_fan_to_triangles<T: Copy + std::fmt::Debug>(vertices: Vec<T>) ->
 
     let mut result = Vec::with_capacity((vertices.len() - 2) * 3);
     for src in gather_indices {
-        dbg!(src);
         result.push(vertices[src]);
     }
     result
