@@ -61,6 +61,7 @@ pub struct Shape {
     pub index_offsets: [usize; 1],
     pub vertex_buffer: Vec<u8>,
     pub index_buffer: Vec<u8>,
+    pub convex_box: Vec<f32>,
 }
 
 /// Andrew's (monotone chain) convex hull algorithm
@@ -111,7 +112,6 @@ struct Vec2 {
 #[repr(C)]
 struct Vertex {
     pos: Vec2,
-    uv: Vec2,
 }
 
 impl Shape {
@@ -146,27 +146,21 @@ impl Shape {
         let full_screen_texture: [Vertex; 6] = [
             Vertex {
                 pos: Vec2 { x: -1.0, y: -1.0 },
-                uv: Vec2 { x: 0., y: 0. },
             },
             Vertex {
                 pos: Vec2 { x: 1., y: -1. },
-                uv: Vec2 { x: 1., y: 0. },
             },
             Vertex {
                 pos: Vec2 { x: 1., y: 1. },
-                uv: Vec2 { x: 1., y: 1. },
             },
             Vertex {
                 pos: Vec2 { x: -1.0, y: -1.0 },
-                uv: Vec2 { x: 0., y: 0. },
             },
             Vertex {
                 pos: Vec2 { x: 1.0, y: 1.0 },
-                uv: Vec2 { x: 1., y: 1. },
             },
             Vertex {
                 pos: Vec2 { x: -1.0, y: 1.0 },
-                uv: Vec2 { x: 0., y: 1. },
             },
         ];
         let (vertex_offsets, vertex_buffer) = concat_buffers!([
@@ -185,6 +179,7 @@ impl Shape {
             index_offsets,
             vertex_buffer,
             index_buffer,
+            convex_box,
         })
     }
 }

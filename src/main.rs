@@ -4,7 +4,7 @@ mod path_rendering;
 
 use {
     geometric_algebra::{
-        ppga3d::{Rotor, Translator},
+        ppga3d::{Motor, Rotor, Translator},
         GeometricProduct, One,
     },
     macroquad::prelude::*,
@@ -44,11 +44,11 @@ fn window_conf() -> Conf {
 //
 const JITTER_PATTERN: [[f32; 2]; 6] = [
     [-1. / 12.0, -5. / 12.0],
-    [ 1. / 12.0,  1. / 12.0],
-    [ 3. / 12.0, -1. / 12.0],
-    [ 5. / 12.0,  5. / 12.0],
-    [ 7. / 12.0, -3. / 12.0],
-    [ 9. / 12.0,  3. / 12.0],
+    [1. / 12.0, 1. / 12.0],
+    [3. / 12.0, -1. / 12.0],
+    [5. / 12.0, 5. / 12.0],
+    [7. / 12.0, -3. / 12.0],
+    [9. / 12.0, 3. / 12.0],
 ];
 
 #[macroquad::main(window_conf)]
@@ -121,7 +121,7 @@ async fn main() {
                 Some(offscreen_pass),
                 PassAction::clear_color(0.0, 0.0, 0.0, 0.0),
             );
-            let projection_matrix = matrix_multiplication(
+            let mut projection_matrix = matrix_multiplication(
                 &perspective_projection(
                     std::f32::consts::PI * 0.5,
                     screen_width() / screen_height(),
@@ -129,7 +129,7 @@ async fn main() {
                     1000.0,
                 ),
                 &motor3d_to_mat4(
-                    &Translator::new(1.5, 0.0, 0.0, -0.5 * 3.0).geometric_product(Rotor::one()),
+                    &Translator::new(1.0, 0.0, 0.0, -1.0).geometric_product(Rotor::one()),
                 ),
             );
 
@@ -156,7 +156,9 @@ async fn main() {
                     std::mem::size_of::<Vertex3f>(),
                 ),
             ] {
+                let scale = 1. / screen_dpi_scale();
                 for j in 0..JITTER_PATTERN.len() {
+					let offset = JITTER_PATTERN[j];
                     gl.quad_context.apply_pipeline(pipeline);
                     gl.quad_context.apply_bindings(bindings);
                     let mut in_color = [0.0; 4];
@@ -166,6 +168,12 @@ async fn main() {
                         in_color[1] = if j == 2 { 1.0 } else { 0.0 };
                         in_color[2] = if j == 4 { 1.0 } else { 0.0 };
                     }
+                    // projection_matrix = matrix_multiplication(
+                    //     &projection_matrix,
+                    //     &motor3d_to_mat4(
+                    //         &Translator::new(1.0, (offset[0] * scale) / (-1.0), (offset[1] * scale) / (-1.0), 0.0).geometric_product(Rotor::one()),
+                    //     ),
+                    // );
                     gl.quad_context
                         .apply_uniforms(miniquad::UniformsSource::table(
                             &raw_miniquad::shader::Uniforms {
@@ -201,12 +209,18 @@ async fn main() {
                         transform_row_2: projection_matrix[2].into(),
                         transform_row_3: projection_matrix[3].into(),
                         in_color: [0.0; 4],
+                        in_rect: [
+                            stage.shape2.convex_box[0].floor(),
+                            1. - stage.shape2.convex_box[3].ceil(),
+                            stage.shape2.convex_box[2].ceil(),
+                            1. - stage.shape2.convex_box[1].floor(),
+                        ],
                     },
                 ));
 
             let begin_offset = stage.shape2.vertex_offsets[5];
             let end_offset = stage.shape2.vertex_offsets[6];
-            let vertex_size = std::mem::size_of::<Vertex2f>();
+            let vertex_size = std::mem::size_of::<Vertex0>();
             gl.quad_context.draw(
                 0,
                 ((end_offset - begin_offset) / vertex_size)

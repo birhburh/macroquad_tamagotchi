@@ -175,7 +175,7 @@ pub mod raw_miniquad {
                 BufferSource::slice(vertices),
             );
 
-            let vertex_size = std::mem::size_of::<Vertex2f>();
+            let vertex_size = std::mem::size_of::<Vertex0>();
             let indices: Vec<u16> =
                 (0..((end_offset - begin_offset) / vertex_size) as u16).collect();
 
@@ -212,18 +212,15 @@ pub mod raw_miniquad {
                 .unwrap();
             let color_cover_pipeline = ctx.new_pipeline(
                 &[BufferLayout::default()],
-                &[
-                    VertexAttribute::new("position", VertexFormat::Float2),
-                    VertexAttribute::new("in_uv", VertexFormat::Float2),
-                ],
+                &[VertexAttribute::new("position", VertexFormat::Float2)],
                 color_cover_shader,
                 PipelineParams {
                     primitive_type: PrimitiveType::Triangles,
-                    // color_blend: Some(BlendState::new(
-                    //     Equation::Add,
-                    //     BlendFactor::Zero,
-                    //     BlendFactor::Value(BlendValue::SourceColor),
-                    // )),
+                    color_blend: Some(BlendState::new(
+                        Equation::Add,
+                        BlendFactor::Zero,
+                        BlendFactor::Value(BlendValue::SourceColor),
+                    )),
                     ..Default::default()
                 },
             );
@@ -514,29 +511,53 @@ void main() {
         }
 
         pub const COVER_VERTEX: &str = r#"#version 100
-precision lowp float;
+            precision lowp float;
 
-    attribute vec2 position;
-    attribute vec2 in_uv;
+            uniform vec4 in_rect;
 
-    varying vec2 texcoord;
+            attribute vec2 position;
 
-    void main() {
-        gl_Position = vec4(position, 0, 1);
-        texcoord = in_uv;
-    }
-"#;
+            varying vec2 _coord2;
+
+            void main() {
+                _coord2 = mix(in_rect.xy, in_rect.zw, position * 0.5 + 0.5);
+	            gl_Position = vec4(_coord2 * 2.0 - 1.0, 0.0, 1.0);
+            }
+        "#;
 
         pub const COVER_FRAGMENT: &str = r#"#version 100
-precision lowp float;
+            precision lowp float;
 
-varying vec2 texcoord;
+            uniform sampler2D tex;
+            uniform vec4 in_color;
 
-uniform sampler2D tex;
+            varying vec2 _coord2;
 
-void main() {
-    gl_FragColor = texture2D(tex, texcoord);
-}"#;
+            void main() {
+                // Get samples for -2/3 and -1/3
+                vec2 valueL = texture2D(tex, vec2(_coord2.x, _coord2.y)).yz * 255.0;
+                vec2 lowerL = mod(valueL, 16.0);
+                vec2 upperL = (valueL - lowerL) / 16.0;
+                vec2 alphaL = min(abs(upperL - lowerL), 2.0);
+
+                // Get samples for 0, +1/3, and +2/3
+                vec3 valueR = texture2D(tex, _coord2).xyz * 255.0;
+                vec3 lowerR = mod(valueR, 16.0);
+                vec3 upperR = (valueR - lowerR) / 16.0;
+                vec3 alphaR = min(abs(upperR - lowerR), 2.0);
+
+                // Average the energy over the pixels on either side
+                vec4 rgba = vec4(
+                    (alphaR.x + alphaR.y + alphaR.z) / 6.0,
+                    (alphaL.y + alphaR.x + alphaR.y) / 6.0,
+                    (alphaL.x + alphaL.y + alphaR.x) / 6.0,
+                    0.0);
+
+                // Optionally scale by a color
+                gl_FragColor = in_color.a == 0.0 ? 1.0 - rgba : in_color * rgba;
+                // gl_FragColor = vec4(0.0);
+            }
+        "#;
 
         pub const COVER_METAL: &str = r#"
     #include <metal_stdlib>
@@ -593,6 +614,7 @@ void main() {
                         UniformDesc::new("transform_row_2", UniformType::Float4),
                         UniformDesc::new("transform_row_3", UniformType::Float4),
                         UniformDesc::new("in_color", UniformType::Float4),
+                        UniformDesc::new("in_rect", UniformType::Float4),
                     ],
                 },
             }
@@ -605,6 +627,7 @@ void main() {
             pub transform_row_2: [f32; 4],
             pub transform_row_3: [f32; 4],
             pub in_color: [f32; 4],
+            pub in_rect: [f32; 4],
         }
     }
 }
