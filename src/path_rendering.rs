@@ -43,6 +43,8 @@ pub mod raw_miniquad {
                     major_alignment: Alignment::Center,
                     minor_alignment: Alignment::Center,
                 },
+                // "W",
+                // "H",
                 "WHO",
                 // "Hego",
                 // "H",
@@ -274,7 +276,7 @@ precision lowp float;
 uniform vec4 in_color;
 
 void main() {
-    gl_FragColor = in_color * (gl_FrontFacing ? 16.0 / 255.0 : 1.0 / 255.0);
+    gl_FragColor = in_color * (gl_FrontFacing ? 1.0 / 255.0 : 16.0 / 255.0);
 }"#;
 
         pub const FILL_METAL: &str = r#"
@@ -348,7 +350,7 @@ uniform vec4 in_color;
 
 void main() {
     if ((weights.x * weights.x - weights.y * weights.z) <= 0.0)
-        gl_FragColor = in_color * (gl_FrontFacing ? 16.0 / 255.0 : 1.0 / 255.0);
+        gl_FragColor = in_color * (gl_FrontFacing ? 1.0 / 255.0 : 16.0 / 255.0);
     else
         discard;
 }"#;
@@ -432,7 +434,7 @@ uniform vec4 in_color;
 
 void main() {
     if ((weights.x * weights.x - weights.y) <= 0.0)
-        gl_FragColor = in_color * (gl_FrontFacing ? 16.0 / 255.0 : 1.0 / 255.0);
+        gl_FragColor = in_color * (gl_FrontFacing ? 1.0 / 255.0 : 16.0 / 255.0);
     else
         discard;
 }"#;

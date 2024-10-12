@@ -159,15 +159,16 @@ async fn main() {
                 let scale = 1. / screen_dpi_scale();
                 for j in 0..JITTER_PATTERN.len() {
 					let offset = JITTER_PATTERN[j];
+                    // dbg!(offset);
                     gl.quad_context.apply_pipeline(pipeline);
                     gl.quad_context.apply_bindings(bindings);
-                    let mut in_color = [0.0; 4];
+                    let mut in_color = [1.0; 4];
 
-                    if j % 2 == 0 {
-                        in_color[0] = if j == 0 { 1.0 } else { 0.0 };
-                        in_color[1] = if j == 2 { 1.0 } else { 0.0 };
-                        in_color[2] = if j == 4 { 1.0 } else { 0.0 };
-                    }
+                    // if j % 2 == 0 {
+                    //     in_color[0] = if j == 0 { 1.0 } else { 0.0 };
+                    //     in_color[1] = if j == 2 { 1.0 } else { 0.0 };
+                    //     in_color[2] = if j == 4 { 1.0 } else { 0.0 };
+                    // }
                     // projection_matrix = matrix_multiplication(
                     //     &projection_matrix,
                     //     &motor3d_to_mat4(
