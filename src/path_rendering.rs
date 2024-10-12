@@ -45,6 +45,7 @@ pub mod raw_miniquad {
                 },
                 // "W",
                 // "H",
+                // "O",
                 "WHO",
                 // "Hego",
                 // "H",
@@ -350,7 +351,7 @@ uniform vec4 in_color;
 
 void main() {
     if ((weights.x * weights.x - weights.y * weights.z) <= 0.0)
-        gl_FragColor = in_color * (gl_FrontFacing ? 1.0 / 255.0 : 16.0 / 255.0);
+        gl_FragColor = in_color * (gl_FrontFacing ? 16.0 / 255.0 : 1.0 / 255.0);
     else
         discard;
 }"#;
@@ -434,7 +435,7 @@ uniform vec4 in_color;
 
 void main() {
     if ((weights.x * weights.x - weights.y) <= 0.0)
-        gl_FragColor = in_color * (gl_FrontFacing ? 1.0 / 255.0 : 16.0 / 255.0);
+        gl_FragColor = in_color * (gl_FrontFacing ? 16.0 / 255.0 : 1.0 / 255.0);
     else
         discard;
 }"#;

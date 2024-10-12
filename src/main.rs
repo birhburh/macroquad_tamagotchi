@@ -164,17 +164,17 @@ async fn main() {
                     gl.quad_context.apply_bindings(bindings);
                     let mut in_color = [1.0; 4];
 
-                    // if j % 2 == 0 {
-                    //     in_color[0] = if j == 0 { 1.0 } else { 0.0 };
-                    //     in_color[1] = if j == 2 { 1.0 } else { 0.0 };
-                    //     in_color[2] = if j == 4 { 1.0 } else { 0.0 };
-                    // }
-                    // projection_matrix = matrix_multiplication(
-                    //     &projection_matrix,
-                    //     &motor3d_to_mat4(
-                    //         &Translator::new(1.0, (offset[0] * scale) / (-1.0), (offset[1] * scale) / (-1.0), 0.0).geometric_product(Rotor::one()),
-                    //     ),
-                    // );
+                    if j % 2 == 0 {
+                        in_color[0] = if j == 0 { 1.0 } else { 0.0 };
+                        in_color[1] = if j == 2 { 1.0 } else { 0.0 };
+                        in_color[2] = if j == 4 { 1.0 } else { 0.0 };
+                    }
+                    projection_matrix = matrix_multiplication(
+                        &projection_matrix,
+                        &motor3d_to_mat4(
+                            &Translator::new(1.0, (offset[0] * scale) / screen_width(), (offset[1] * scale) / screen_height(), 0.0).geometric_product(Rotor::one()),
+                        ),
+                    );
                     gl.quad_context
                         .apply_uniforms(miniquad::UniformsSource::table(
                             &raw_miniquad::shader::Uniforms {
