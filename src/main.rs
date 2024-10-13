@@ -110,17 +110,20 @@ async fn main() {
         // draw_lottie(&model);
 
         {
+            let draw_to_texture = true;
             let mut gl = unsafe { get_internal_gl() };
 
             // Ensure that macroquad's shapes are not going to be lost
             gl.flush();
 
-            // gl.quad_context
-            //     .begin_default_pass(PassAction::Nothing);
-            gl.quad_context.begin_pass(
-                Some(offscreen_pass),
-                PassAction::clear_color(0.0, 0.0, 0.0, 0.0),
-            );
+            if draw_to_texture {
+                gl.quad_context.begin_pass(
+                    Some(offscreen_pass),
+                    PassAction::clear_color(0.0, 0.0, 0.0, 0.0),
+                );
+            } else {
+                gl.quad_context.begin_default_pass(PassAction::Nothing);
+            }
             let mut projection_matrix = matrix_multiplication(
                 &perspective_projection(
                     std::f32::consts::PI * 0.5,
@@ -162,7 +165,7 @@ async fn main() {
                     // dbg!(offset);
                     gl.quad_context.apply_pipeline(pipeline);
                     gl.quad_context.apply_bindings(bindings);
-                    let mut in_color = [1.0; 4];
+                    let mut in_color = [0.0; 4];
 
                     if j % 2 == 0 {
                         in_color[0] = if j == 0 { 1.0 } else { 0.0 };
@@ -203,40 +206,42 @@ async fn main() {
             }
             gl.quad_context.end_render_pass();
 
-            gl.quad_context.begin_default_pass(PassAction::Nothing);
+            if draw_to_texture {
+                gl.quad_context.begin_default_pass(PassAction::Nothing);
 
-            gl.quad_context.apply_pipeline(&stage.color_cover_pipeline);
-            gl.quad_context.apply_bindings(&stage.color_cover_bindings);
+                gl.quad_context.apply_pipeline(&stage.color_cover_pipeline);
+                gl.quad_context.apply_bindings(&stage.color_cover_bindings);
 
-            gl.quad_context
-                .apply_uniforms(miniquad::UniformsSource::table(
-                    &raw_miniquad::shader::CoverUniforms {
-                        transform_row_0: projection_matrix[0].into(),
-                        transform_row_1: projection_matrix[1].into(),
-                        transform_row_2: projection_matrix[2].into(),
-                        transform_row_3: projection_matrix[3].into(),
-                        in_color: [0.0; 4],
-                        in_rect: [
-                            stage.shape2.convex_box[0].floor(),
-                            1. - stage.shape2.convex_box[3].ceil(),
-                            stage.shape2.convex_box[2].ceil(),
-                            1. - stage.shape2.convex_box[1].floor(),
-                        ],
-                    },
-                ));
+                gl.quad_context
+                    .apply_uniforms(miniquad::UniformsSource::table(
+                        &raw_miniquad::shader::CoverUniforms {
+                            transform_row_0: projection_matrix[0].into(),
+                            transform_row_1: projection_matrix[1].into(),
+                            transform_row_2: projection_matrix[2].into(),
+                            transform_row_3: projection_matrix[3].into(),
+                            in_color: [0.0; 4],
+                            in_rect: [
+                                stage.shape2.convex_box[0].floor(),
+                                1. - stage.shape2.convex_box[3].ceil(),
+                                stage.shape2.convex_box[2].ceil(),
+                                1. - stage.shape2.convex_box[1].floor(),
+                            ],
+                        },
+                    ));
 
-            let begin_offset = stage.shape2.vertex_offsets[5];
-            let end_offset = stage.shape2.vertex_offsets[6];
-            let vertex_size = std::mem::size_of::<Vertex0>();
-            gl.quad_context.draw(
-                0,
-                ((end_offset - begin_offset) / vertex_size)
-                    .try_into()
-                    .unwrap(),
-                1,
-            );
+                let begin_offset = stage.shape2.vertex_offsets[5];
+                let end_offset = stage.shape2.vertex_offsets[6];
+                let vertex_size = std::mem::size_of::<Vertex0>();
+                gl.quad_context.draw(
+                    0,
+                    ((end_offset - begin_offset) / vertex_size)
+                        .try_into()
+                        .unwrap(),
+                    1,
+                );
 
-            gl.quad_context.end_render_pass();
+                gl.quad_context.end_render_pass();
+            }
         }
 
         next_frame().await;

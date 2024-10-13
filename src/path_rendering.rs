@@ -14,6 +14,7 @@ mod text;
 const OPEN_SANS_TTF: &[u8] = include_bytes!("../fonts/OpenSans-Regular.ttf");
 
 pub mod raw_miniquad {
+    use super::path::{LineSegment, Path};
     use super::renderer::Shape;
     use super::text::{paths_of_text, Alignment, Layout, Orientation};
     use super::vertex::{Vertex0, Vertex2f, Vertex3f};
@@ -56,9 +57,29 @@ pub mod raw_miniquad {
                 path.reverse();
             }
             paths[0].stroke_options = None;
-            let shape2 = Shape::from_paths(&paths).unwrap();
+            // let shape2 = Shape::from_paths(&paths).unwrap();
 
             // let shape2 = Shape::from_paths(&vec![Path::from_circle([0.0, 0.0], 0.5)]).unwrap();
+
+            // let mut path = Path::from_circle([0.0, 0.0], 1.0);
+            let mut path = Path::default();
+            path.start = [0., 0.].into();
+            path.push_line(LineSegment {
+                control_points: [[1., 1.].into()],
+            });
+            path.push_line(LineSegment {
+                control_points: [[0., 1.].into()],
+            });
+            let mut path2 = Path::default();
+            path2.start = [0., 0.].into();
+            path2.push_line(LineSegment {
+                control_points: [[1., 1.].into()],
+            });
+            path2.push_line(LineSegment {
+                control_points: [[0.5, 1.].into()],
+            });
+            let paths = vec![path, path2, Path::from_circle([0.0, 0.0], 0.5)];
+            let shape2 = Shape::from_paths(&paths).unwrap();
 
             let mut fill_solid_pipeline = None;
             let mut fill_solid_bindings = None;
