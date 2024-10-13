@@ -133,32 +133,32 @@ async fn main() {
                 ),
             );
 
-            for (pipeline, bindings, begin_offset, end_offset, vertex_size) in [
-                (
-                    &stage.fill_solid_pipeline,
-                    &stage.fill_solid_bindings,
-                    0,
-                    stage.shape2.vertex_offsets[0],
-                    std::mem::size_of::<Vertex0>(),
-                ),
-                (
-                    &stage.fill_integral_quadratic_curve_pipeline,
-                    &stage.fill_integral_quadratic_curve_bindings,
-                    stage.shape2.vertex_offsets[0],
-                    stage.shape2.vertex_offsets[1],
-                    std::mem::size_of::<Vertex2f>(),
-                ),
-                (
-                    &stage.fill_rational_quadratic_curve_pipeline,
-                    &stage.fill_rational_quadratic_curve_bindings,
-                    stage.shape2.vertex_offsets[2],
-                    stage.shape2.vertex_offsets[3],
-                    std::mem::size_of::<Vertex3f>(),
-                ),
-            ] {
-                let scale = 1. / screen_dpi_scale();
-                for j in 0..JITTER_PATTERN.len() {
-					let offset = JITTER_PATTERN[j];
+            for j in 0..JITTER_PATTERN.len() {
+                let offset = JITTER_PATTERN[j];
+                for (pipeline, bindings, begin_offset, end_offset, vertex_size) in [
+                    (
+                        &stage.fill_solid_pipeline,
+                        &stage.fill_solid_bindings,
+                        0,
+                        stage.shape2.vertex_offsets[0],
+                        std::mem::size_of::<Vertex0>(),
+                    ),
+                    (
+                        &stage.fill_integral_quadratic_curve_pipeline,
+                        &stage.fill_integral_quadratic_curve_bindings,
+                        stage.shape2.vertex_offsets[0],
+                        stage.shape2.vertex_offsets[1],
+                        std::mem::size_of::<Vertex2f>(),
+                    ),
+                    (
+                        &stage.fill_rational_quadratic_curve_pipeline,
+                        &stage.fill_rational_quadratic_curve_bindings,
+                        stage.shape2.vertex_offsets[2],
+                        stage.shape2.vertex_offsets[3],
+                        std::mem::size_of::<Vertex3f>(),
+                    ),
+                ] {
+                    let scale = 1. / screen_dpi_scale();
                     // dbg!(offset);
                     gl.quad_context.apply_pipeline(pipeline);
                     gl.quad_context.apply_bindings(bindings);
@@ -169,12 +169,18 @@ async fn main() {
                         in_color[1] = if j == 2 { 1.0 } else { 0.0 };
                         in_color[2] = if j == 4 { 1.0 } else { 0.0 };
                     }
-                    projection_matrix = matrix_multiplication(
-                        &projection_matrix,
-                        &motor3d_to_mat4(
-                            &Translator::new(1.0, (offset[0] * scale) / screen_width(), (offset[1] * scale) / screen_height(), 0.0).geometric_product(Rotor::one()),
-                        ),
-                    );
+                    // projection_matrix = matrix_multiplication(
+                    //     &projection_matrix,
+                    //     &motor3d_to_mat4(
+                    //         &Translator::new(
+                    //             1.0,
+                    //             (offset[0] * scale) / screen_width(),
+                    //             (offset[1] * scale) / screen_height(),
+                    //             0.0,
+                    //         )
+                    //         .geometric_product(Rotor::one()),
+                    //     ),
+                    // );
                     gl.quad_context
                         .apply_uniforms(miniquad::UniformsSource::table(
                             &raw_miniquad::shader::Uniforms {
