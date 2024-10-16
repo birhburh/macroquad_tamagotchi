@@ -44,10 +44,10 @@ pub mod raw_miniquad {
                     major_alignment: Alignment::Center,
                     minor_alignment: Alignment::Center,
                 },
-                "W",
+                // "W",
                 // "H",
                 // "O",
-                // "WHO",
+                "WHO",
                 // "Hego",
                 // "H",
                 // "HW",
@@ -57,29 +57,20 @@ pub mod raw_miniquad {
                 path.reverse();
             }
             paths[0].stroke_options = None;
-            // let shape2 = Shape::from_paths(&paths).unwrap();
+            let shape2 = Shape::from_paths(&paths).unwrap();
 
             // let shape2 = Shape::from_paths(&vec![Path::from_circle([0.0, 0.0], 0.5)]).unwrap();
 
-            // let mut path = Path::from_circle([0.0, 0.0], 1.0);
-            let mut path = Path::default();
-            path.start = [0., 0.].into();
-            path.push_line(LineSegment {
-                control_points: [[1., 1.].into()],
-            });
-            path.push_line(LineSegment {
-                control_points: [[0., 1.].into()],
-            });
-            let mut path2 = Path::default();
-            path2.start = [0., 0.].into();
-            path2.push_line(LineSegment {
-                control_points: [[1., 1.].into()],
-            });
-            path2.push_line(LineSegment {
-                control_points: [[0.5, 1.].into()],
-            });
-            let paths = vec![path, path2, Path::from_circle([0.0, 0.0], 0.5)];
-            let shape2 = Shape::from_paths(&paths).unwrap();
+            // let mut path = Path::default();
+            // path.start = [0., 0.].into();
+            // path.push_line(LineSegment {
+            //     control_points: [[0., 1.].into()],
+            // });
+            // path.push_line(LineSegment {
+            //     control_points: [[1., 1.].into()],
+            // });
+            // let paths = vec![path];
+            // let shape2 = Shape::from_paths(&paths).unwrap();
 
             let mut fill_solid_pipeline = None;
             let mut fill_solid_bindings = None;
@@ -199,7 +190,7 @@ pub mod raw_miniquad {
                 BufferSource::slice(vertices),
             );
 
-            let vertex_size = std::mem::size_of::<Vertex0>();
+            let vertex_size = std::mem::size_of::<Vertex2f>();
             let indices: Vec<u16> =
                 (0..((end_offset - begin_offset) / vertex_size) as u16).collect();
 
@@ -236,15 +227,18 @@ pub mod raw_miniquad {
                 .unwrap();
             let color_cover_pipeline = ctx.new_pipeline(
                 &[BufferLayout::default()],
-                &[VertexAttribute::new("position", VertexFormat::Float2)],
+                &[
+                    VertexAttribute::new("position", VertexFormat::Float2),
+                    VertexAttribute::new("in_uv", VertexFormat::Float2),
+                ],
                 color_cover_shader,
                 PipelineParams {
                     primitive_type: PrimitiveType::Triangles,
-                    color_blend: Some(BlendState::new(
-                        Equation::Add,
-                        BlendFactor::Zero,
-                        BlendFactor::Value(BlendValue::SourceColor),
-                    )),
+                    // color_blend: Some(BlendState::new(
+                    //     Equation::Add,
+                    //     BlendFactor::Zero,
+                    //     BlendFactor::Value(BlendValue::SourceColor),
+                    // )),
                     ..Default::default()
                 },
             );
@@ -535,6 +529,10 @@ void main() {
         }
 
         pub const COVER_VERTEX: &str = r#"#version 100
+            attribute vec2 in_uv;
+
+            varying vec2 texcoord;
+
             precision lowp float;
 
             uniform vec4 in_rect;
@@ -543,11 +541,11 @@ void main() {
 
             varying vec2 _coord2;
 
-            void main() {
-                _coord2 = mix(in_rect.xy, in_rect.zw, position * 0.5 + 0.5);
-	            gl_Position = vec4(_coord2 * 2.0 - 1.0, 0.0, 1.0);
-            }
-        "#;
+    void main() {
+        gl_Position = vec4(position, 0, 1);
+        texcoord = in_uv;
+    }
+"#;
 
         pub const COVER_FRAGMENT: &str = r#"#version 100
             precision lowp float;
@@ -555,17 +553,17 @@ void main() {
             uniform sampler2D tex;
             uniform vec4 in_color;
 
-            varying vec2 _coord2;
+            varying vec2 texcoord;
 
             void main() {
                 // Get samples for -2/3 and -1/3
-                vec2 valueL = texture2D(tex, vec2(_coord2.x, _coord2.y)).yz * 255.0;
+                vec2 valueL = texture2D(tex, texcoord).yz * 255.0;
                 vec2 lowerL = mod(valueL, 16.0);
                 vec2 upperL = (valueL - lowerL) / 16.0;
                 vec2 alphaL = min(abs(upperL - lowerL), 2.0);
 
                 // Get samples for 0, +1/3, and +2/3
-                vec3 valueR = texture2D(tex, _coord2).xyz * 255.0;
+                vec3 valueR = texture2D(tex, texcoord).xyz * 255.0;
                 vec3 lowerR = mod(valueR, 16.0);
                 vec3 upperR = (valueR - lowerR) / 16.0;
                 vec3 alphaR = min(abs(upperR - lowerR), 2.0);
@@ -579,7 +577,7 @@ void main() {
 
                 // Optionally scale by a color
                 gl_FragColor = in_color.a == 0.0 ? 1.0 - rgba : in_color * rgba;
-                // gl_FragColor = vec4(0.0);
+                // gl_FragColor = rgba;
             }
         "#;
 

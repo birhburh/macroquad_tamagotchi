@@ -112,6 +112,7 @@ struct Vec2 {
 #[repr(C)]
 struct Vertex {
     pos: Vec2,
+    uv: Vec2,
 }
 
 impl Shape {
@@ -146,23 +147,30 @@ impl Shape {
         let full_screen_texture: [Vertex; 6] = [
             Vertex {
                 pos: Vec2 { x: -1.0, y: -1.0 },
+                uv: Vec2 { x: 0., y: 0. },
             },
             Vertex {
                 pos: Vec2 { x: 1., y: -1. },
+                uv: Vec2 { x: 1., y: 0. },
             },
             Vertex {
                 pos: Vec2 { x: 1., y: 1. },
+                uv: Vec2 { x: 1., y: 1. },
             },
             Vertex {
                 pos: Vec2 { x: -1.0, y: -1.0 },
+                uv: Vec2 { x: 0., y: 0. },
             },
             Vertex {
                 pos: Vec2 { x: 1.0, y: 1.0 },
+                uv: Vec2 { x: 1., y: 1. },
             },
             Vertex {
                 pos: Vec2 { x: -1.0, y: 1.0 },
+                uv: Vec2 { x: 0., y: 1. },
             },
         ];
+        dbg!(&fill_builder.solid_vertices);
         let (vertex_offsets, vertex_buffer) = concat_buffers!([
             &fill_builder.solid_vertices,
             &fill_builder.integral_quadratic_vertices,

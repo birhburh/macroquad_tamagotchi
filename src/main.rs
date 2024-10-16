@@ -124,7 +124,7 @@ async fn main() {
             } else {
                 gl.quad_context.begin_default_pass(PassAction::Nothing);
             }
-            let mut projection_matrix = matrix_multiplication(
+            let projection_matrix = matrix_multiplication(
                 &perspective_projection(
                     std::f32::consts::PI * 0.5,
                     screen_width() / screen_height(),
@@ -165,32 +165,32 @@ async fn main() {
                     // dbg!(offset);
                     gl.quad_context.apply_pipeline(pipeline);
                     gl.quad_context.apply_bindings(bindings);
-                    let mut in_color = [0.0; 4];
+                    let mut in_color = [1.0; 4];
 
                     if j % 2 == 0 {
                         in_color[0] = if j == 0 { 1.0 } else { 0.0 };
                         in_color[1] = if j == 2 { 1.0 } else { 0.0 };
                         in_color[2] = if j == 4 { 1.0 } else { 0.0 };
                     }
-                    // projection_matrix = matrix_multiplication(
-                    //     &projection_matrix,
-                    //     &motor3d_to_mat4(
-                    //         &Translator::new(
-                    //             1.0,
-                    //             (offset[0] * scale) / screen_width(),
-                    //             (offset[1] * scale) / screen_height(),
-                    //             0.0,
-                    //         )
-                    //         .geometric_product(Rotor::one()),
-                    //     ),
-                    // );
+                    let jitter_matrix = matrix_multiplication(
+                        &projection_matrix,
+                        &motor3d_to_mat4(
+                            &Translator::new(
+                                1.0,
+                                (offset[0] * scale) / screen_width(),
+                                (offset[1] * scale) / screen_height(),
+                                0.0,
+                            )
+                            .geometric_product(Rotor::one()),
+                        ),
+                    );
                     gl.quad_context
                         .apply_uniforms(miniquad::UniformsSource::table(
                             &raw_miniquad::shader::Uniforms {
-                                transform_row_0: projection_matrix[0].into(),
-                                transform_row_1: projection_matrix[1].into(),
-                                transform_row_2: projection_matrix[2].into(),
-                                transform_row_3: projection_matrix[3].into(),
+                                transform_row_0: jitter_matrix[0].into(),
+                                transform_row_1: jitter_matrix[1].into(),
+                                transform_row_2: jitter_matrix[2].into(),
+                                transform_row_3: jitter_matrix[3].into(),
                                 in_color,
                             },
                         ));
