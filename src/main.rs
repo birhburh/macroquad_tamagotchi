@@ -18,13 +18,14 @@ use {
 
 fn window_conf() -> Conf {
     let sample_count = 1;
+    let high_dpi = false;
     Conf {
-        window_title: format!("Lottie Example (sample_count = {sample_count})").to_owned(),
+        window_title: format!("Lottie Example (sample_count = {sample_count}, high_dpi = {high_dpi})").to_owned(),
         platform: miniquad::conf::Platform {
             apple_gfx_api: miniquad::conf::AppleGfxApi::OpenGl,
             ..Default::default()
         },
-        // high_dpi: true,
+        high_dpi,
         sample_count,
         ..Default::default()
     }
@@ -132,7 +133,7 @@ async fn main() {
                     1000.0,
                 ),
                 &motor3d_to_mat4(
-                    &Translator::new(1.0, 0.0, 0.0, -1.0).geometric_product(Rotor::one()),
+                    &Translator::new(1.0, 0.0, 0.0, -0.5).geometric_product(Rotor::one()),
                 ),
             );
 

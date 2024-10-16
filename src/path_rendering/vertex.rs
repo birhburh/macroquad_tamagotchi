@@ -25,14 +25,14 @@ pub fn triangle_fan_to_triangles<T: Copy + std::fmt::Debug>(vertices: Vec<T>) ->
     // 0 1 2 3
     // new order:
     // 0 1 2 3 4 5
-    // 0 1 2 0 2 3
+    // 0 2 1 0 3 2
     // if more vertices it looks like this:
     // 0 1 2 3 4 5 6 7 8 9 10 11
-    // 0 1 2 0 2 3 0 3 4 0  4  5
+    // 0 2 1 0 3 2 0 4 3 0  5  4
     let gather_indices = (0..((vertices.len() - 2) * 3)).map(|i| match i % 3 {
         0 => 0,
-        1 => (i / 3) + 1,
-        2 => (i / 3) + 2,
+        1 => (i / 3) + 2,
+        2 => (i / 3) + 1,
         _ => unreachable!(),
     });
 
