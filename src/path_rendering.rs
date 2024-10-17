@@ -44,10 +44,10 @@ pub mod raw_miniquad {
                     major_alignment: Alignment::Center,
                     minor_alignment: Alignment::Center,
                 },
-                "W",
+                // "W",
                 // "H",
                 // "O",
-                // "WHO",
+                "WHO",
                 // "Hego",
                 // "H",
                 // "HW",
@@ -578,6 +578,7 @@ void main() {
                 // Optionally scale by a color
                 gl_FragColor = in_color.a == 0.0 ? 1.0 - rgba : in_color * rgba;
                 // gl_FragColor = rgba;
+                // gl_FragColor = vec4(texture2D(tex, texcoord).xyz * 255.0, 1.0);
             }
         "#;
 

@@ -4,11 +4,11 @@ mod path_rendering;
 
 use {
     geometric_algebra::{
-        ppga3d::{Motor, Rotor, Translator},
+        ppga3d::{Rotor, Translator},
         GeometricProduct, One,
     },
     macroquad::prelude::*,
-    miniquad::{PassAction, TextureFormat, TextureParams},
+    miniquad::{window::screen_size, PassAction, TextureFormat, TextureParams},
     path_rendering::{
         raw_miniquad,
         utils::{matrix_multiplication, motor3d_to_mat4, perspective_projection},
@@ -85,9 +85,9 @@ async fn main() {
     loop {
         clear_background(DARKGRAY);
 
-        if offscreen_width != screen_width() as u32 && offscreen_height != screen_height() as u32 {
-            offscreen_width = screen_width() as u32;
-            offscreen_height = screen_height() as u32;
+        if offscreen_width != screen_size().0 as u32 && offscreen_height != screen_size().1 as u32 {
+            offscreen_width = screen_size().0 as u32;
+            offscreen_height = screen_size().1 as u32;
             dbg!((offscreen_width, offscreen_height));
             offscreen_pass = {
                 let InternalGlContext {
@@ -128,14 +128,18 @@ async fn main() {
             let projection_matrix = matrix_multiplication(
                 &perspective_projection(
                     std::f32::consts::PI * 0.5,
-                    screen_width() / screen_height(),
+                    screen_size().0 / screen_size().1,
                     1.0,
                     1000.0,
                 ),
                 &motor3d_to_mat4(
-                    &Translator::new(1.0, 0.0, 0.0, -0.5).geometric_product(Rotor::one()),
+                    &Translator::new(1.0, 0.0, 0.0, -1.0).geometric_product(Rotor::one()),
                 ),
             );
+
+            // let projection_matrix = motor3d_to_mat4(
+            //     &Translator::new(1.0, 0.0, 0.0, 0.0).geometric_product(Rotor::one()),
+            // );
 
             for j in 0..JITTER_PATTERN.len() {
                 let offset = JITTER_PATTERN[j];
@@ -173,13 +177,14 @@ async fn main() {
                         in_color[1] = if j == 2 { 1.0 } else { 0.0 };
                         in_color[2] = if j == 4 { 1.0 } else { 0.0 };
                     }
+                    // let jitter_matrix = projection_matrix;
                     let jitter_matrix = matrix_multiplication(
                         &projection_matrix,
                         &motor3d_to_mat4(
                             &Translator::new(
                                 1.0,
-                                (offset[0] * scale) / screen_width(),
-                                (offset[1] * scale) / screen_height(),
+                                offset[0] / screen_size().0,
+                                offset[1] / screen_size().1,
                                 0.0,
                             )
                             .geometric_product(Rotor::one()),
