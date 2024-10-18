@@ -271,7 +271,7 @@ pub mod raw_miniquad {
         use macroquad::miniquad::*;
 
         pub const FILL_VERTEX: &str = r#"#version 100
-precision lowp float;
+precision highp float;
 
 uniform vec4 transform_row_0;
 uniform vec4 transform_row_1;
@@ -288,7 +288,7 @@ void main() {
 "#;
 
         pub const FILL_FRAGMENT: &str = r#"#version 100
-precision lowp float;
+precision highp float;
 uniform vec4 in_color;
 
 void main() {
@@ -338,7 +338,7 @@ void main() {
 "#;
 
         pub const QUADRATIC_VERTEX: &str = r#"#version 100
-precision lowp float;
+precision highp float;
 
 uniform vec4 transform_row_0;
 uniform vec4 transform_row_1;
@@ -359,7 +359,7 @@ void main() {
 "#;
 
         pub const QUADRATIC_FRAGMENT: &str = r#"#version 100
-precision lowp float;
+precision highp float;
 
 varying vec3 weights;
 uniform vec4 in_color;
@@ -422,7 +422,7 @@ void main() {
 "#;
 
         pub const INTEGRAL_QUADRATIC_VERTEX: &str = r#"#version 100
-precision lowp float;
+precision highp float;
 
 uniform vec4 transform_row_0;
 uniform vec4 transform_row_1;
@@ -443,7 +443,7 @@ void main() {
 "#;
 
         pub const INTEGRAL_QUADRATIC_FRAGMENT: &str = r#"#version 100
-precision lowp float;
+precision highp float;
 varying vec2 weights;
 
 uniform vec4 in_color;
@@ -533,7 +533,7 @@ void main() {
 
             varying vec2 texcoord;
 
-            precision lowp float;
+            precision highp float;
 
             uniform vec4 in_rect;
 
@@ -548,7 +548,7 @@ void main() {
 "#;
 
         pub const COVER_FRAGMENT: &str = r#"#version 100
-            precision lowp float;
+            precision highp float;
 
             uniform sampler2D tex;
             uniform vec4 in_color;

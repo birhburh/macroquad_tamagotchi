@@ -18,11 +18,12 @@ use {
 
 fn window_conf() -> Conf {
     let sample_count = 1;
-    let high_dpi = false;
+    let high_dpi = true;
     Conf {
         window_title: format!("Lottie Example (sample_count = {sample_count}, high_dpi = {high_dpi})").to_owned(),
         platform: miniquad::conf::Platform {
             apple_gfx_api: miniquad::conf::AppleGfxApi::OpenGl,
+            blocking_event_loop: true,
             ..Default::default()
         },
         high_dpi,
@@ -85,10 +86,10 @@ async fn main() {
     loop {
         clear_background(DARKGRAY);
 
-        if offscreen_width != screen_size().0 as u32 && offscreen_height != screen_size().1 as u32 {
+        if offscreen_width != screen_size().0 as u32 || offscreen_height != screen_size().1 as u32 {
             offscreen_width = screen_size().0 as u32;
             offscreen_height = screen_size().1 as u32;
-            dbg!((offscreen_width, offscreen_height));
+
             offscreen_pass = {
                 let InternalGlContext {
                     quad_context: ctx, ..
@@ -183,8 +184,8 @@ async fn main() {
                         &motor3d_to_mat4(
                             &Translator::new(
                                 1.0,
-                                offset[0] / screen_size().0,
-                                offset[1] / screen_size().1,
+                                (offset[0] * scale) / screen_size().0,
+                                (offset[1] * scale) / screen_size().1,
                                 0.0,
                             )
                             .geometric_product(Rotor::one()),
@@ -237,7 +238,7 @@ async fn main() {
 
                 let begin_offset = stage.shape2.vertex_offsets[5];
                 let end_offset = stage.shape2.vertex_offsets[6];
-                let vertex_size = std::mem::size_of::<Vertex0>();
+                let vertex_size = std::mem::size_of::<Vertex2f>();
                 gl.quad_context.draw(
                     0,
                     ((end_offset - begin_offset) / vertex_size)
