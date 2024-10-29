@@ -16,13 +16,20 @@ I try to use lottie animations in there. I wanted to use lottie-rs but there are
 ## Path rendering:
 - [contrast_renderer](https://github.com/Lichtso/contrast_renderer) - Stole most of it for path_rendering module
 - [How to draw a complex shape using a stencil buffer](http://web.archive.org/web/20240118160026/https://www.glprogramming.com/red/chapter14.html#name13)
+- https://github.com/nical/lyon/wiki/Related-projects
+- https://github.com/sunli829/nvg
+- https://github.com/inniyah/nanovg
 ## Path anti-aliasing:
+- https://github.com/mattdesl/glsl-fxaa - currently stealing anti-aliasing from it
 - [Svg to shadertoy generator](https://gist.github.com/Ninja-Koala/74fa7652fb4de248949ce1e27b989c14)
-- https://github.com/evanw/theta - currently stealing anti-aliasing from it
+- https://github.com/evanw/theta - couldn't make it to look good
 - https://github.com/behdad/glyphy - didn't like the result but interesting resource
 - https://github.com/jinleili/sdf-text-view - of course cannot compile because of error in wgpu-core
+- https://github.com/fintelia/smaa-rs - I cannot use wgpu at this point, I just wanted to try running it in a browser's canvas to check how exactly it works but this was not successful;
 - http://wdobbie.com/post/gpu-text-rendering-with-vector-textures/
 - https://medium.com/@evanwallace/easy-scalable-text-rendering-on-the-gpu-c3f4d782c5ac
 - https://handmade.network/forums/t/8799-anti-aliasing_in_fragment_shader
 - https://www.shadertoy.com/view/DtXcRr
 - https://shadertoyunofficial.wordpress.com/2019/01/02/programming-tricks-in-shadertoy-glsl/
+- https://ii.uni.wroc.pl/~anl/cgfiles/Sig99AdvOpenGLnotes/node124.html
+- https://www.cse.msu.edu/~cse872/tutorial5.html
