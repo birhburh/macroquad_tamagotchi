@@ -5,8 +5,8 @@ use area_tex::*;
 #[path = "../third_party/smaa/Textures/SearchTex.rs"]
 mod search_tex;
 use macroquad::{
-    miniquad::{RenderingBackend, ShaderId, ShaderMeta, UniformBlockLayout},
-    prelude::{ShaderError, ShaderSource},
+    miniquad::{RenderingBackend, ShaderId, ShaderMeta},
+    prelude::ShaderSource,
 };
 use search_tex::*;
 
@@ -38,9 +38,6 @@ pub enum ShaderStage {
 
     NeighborhoodBlendingVS,
     NeighborhoodBlendingPS,
-
-    #[allow(unused)]
-    NeighborhoodBlendingAcesTonemapPS,
 }
 impl ShaderStage {
     fn is_vertex_shader(&self) -> bool {
@@ -51,8 +48,7 @@ impl ShaderStage {
 
             ShaderStage::LumaEdgeDetectionPS
             | ShaderStage::BlendingWeightPS
-            | ShaderStage::NeighborhoodBlendingPS
-            | ShaderStage::NeighborhoodBlendingAcesTonemapPS => false,
+            | ShaderStage::NeighborhoodBlendingPS => false,
         }
     }
 
@@ -83,7 +79,7 @@ impl ShaderStage {
                  varying vec2 texcoord;
                  uniform sampler2D colorTex;
                  void main() {
-                    float4 offset[3];
+                    vec4 offset[3];
                     offset[0] = offset0;
                     offset[1] = offset1;
                     offset[2] = offset2;
@@ -91,80 +87,62 @@ impl ShaderStage {
                  }"
             }
             ShaderStage::BlendingWeightVS => {
-                "layout(location = 0) out float2 pixcoord;
-                 layout(location = 1) out float4 offset0;
-                 layout(location = 2) out float4 offset1;
-                 layout(location = 3) out float4 offset2;
-                 layout(location = 4) out float2 texcoord;
+                "varying vec2 pixcoord;
+                 varying vec4 offset0;
+                 varying vec4 offset1;
+                 varying vec4 offset2;
+                 varying vec2 texcoord;
+
+                 attribute vec2 in_pos;
+
                  void main() {
-                     if(gl_VertexIndex == 0) gl_Position = vec4(-1, -1, 1, 1);
-                     if(gl_VertexIndex == 1) gl_Position = vec4(-1,  3, 1, 1);
-        	         if(gl_VertexIndex == 2) gl_Position = vec4( 3, -1, 1, 1);
-                     texcoord = gl_Position.xy * vec2(0.5, -0.5) + vec2(0.5);
-                     float4 offset[3];
+                     gl_Position = vec4(in_pos, 1.0, 1.0);
+                     texcoord = gl_Position.xy * vec2(0.5, 0.5) + vec2(0.5);
+                     vec4 offset[3];
                      SMAABlendingWeightCalculationVS(texcoord, pixcoord, offset);
                      offset0=offset[0];
                      offset1=offset[1];
                      offset2=offset[2];
                  }"
             }
-            ShaderStage::NeighborhoodBlendingVS => {
-                "layout(location = 0) out float4 offset;
-                 layout(location = 1) out float2 texcoord;
-                 void main() {
-                     if(gl_VertexIndex == 0) gl_Position = vec4(-1, -1, 1, 1);
-                     if(gl_VertexIndex == 1) gl_Position = vec4(-1,  3, 1, 1);
-        	         if(gl_VertexIndex == 2) gl_Position = vec4( 3, -1, 1, 1);
-                     texcoord = gl_Position.xy * vec2(0.5, -0.5) + vec2(0.5);
-                     SMAANeighborhoodBlendingVS(texcoord, offset);
-                 }"
-            }
             ShaderStage::BlendingWeightPS => {
-                "layout(location = 0) in float2 pixcoord;
-                 layout(location = 1) in float4 offset0;
-                 layout(location = 2) in float4 offset1;
-                 layout(location = 3) in float4 offset2;
-                 layout(location = 4) in float2 texcoord;
-                 layout(set = 0, binding = 2) uniform texture2D edgesTex;
-                 layout(set = 0, binding = 3) uniform texture2D areaTex;
-                 layout(set = 0, binding = 4) uniform texture2D searchTex;
-                 layout(location = 0) out float4 OutColor;
+                "varying vec2 pixcoord;
+                 varying vec4 offset0;
+                 varying vec4 offset1;
+                 varying vec4 offset2;
+                 varying vec2 texcoord;
+                 uniform sampler2D edgesTex;
+                 uniform sampler2D areaTex;
+                 uniform sampler2D searchTex;
                  void main() {
                      vec4 subsampleIndices = vec4(0);
-                     float4 offset[3];
+                     vec4 offset[3];
                      offset[0] = offset0;
                      offset[1] = offset1;
                      offset[2] = offset2;
-                     OutColor = SMAABlendingWeightCalculationPS(texcoord, pixcoord, offset,
+                     gl_FragColor = SMAABlendingWeightCalculationPS(texcoord, pixcoord, offset,
                          edgesTex, areaTex, searchTex, subsampleIndices);
                  }"
             }
-            ShaderStage::NeighborhoodBlendingPS => {
-                "layout(location = 0) in float4 offset;
-                 layout(location = 1) in float2 texcoord;
-                 layout(set = 0, binding = 2) uniform texture2D colorTex;
-                 layout(set = 0, binding = 3) uniform texture2D blendTex;
-                 layout(location = 0) out float4 OutColor;
+            ShaderStage::NeighborhoodBlendingVS => {
+                "varying vec4 offset;
+                 varying vec2 texcoord;
+
+                 attribute vec2 in_pos;
+
                  void main() {
-                     OutColor = SMAANeighborhoodBlendingPS(texcoord, offset, colorTex, blendTex);
+                     gl_Position = vec4(in_pos, 1.0, 1.0);
+                     texcoord = gl_Position.xy * vec2(0.5, 0.5) + vec2(0.5);
+                     SMAANeighborhoodBlendingVS(texcoord, offset);
                  }"
             }
-            // See: https://knarkowicz.wordpress.com/2016/01/06/aces-filmic-tone-mapping-curve
-            ShaderStage::NeighborhoodBlendingAcesTonemapPS => {
-                "layout(location = 0) in float4 offset;
-                 layout(location = 1) in float2 texcoord;
-                 layout(set = 0, binding = 2) uniform texture2D colorTex;
-                 layout(set = 0, binding = 3) uniform texture2D blendTex;
-                 layout(location = 0) out float4 OutColor;
+            ShaderStage::NeighborhoodBlendingPS => {
+                "varying vec4 offset;
+                 varying vec2 texcoord;
+                 uniform sampler2D colorTex;
+                 uniform sampler2D blendTex;
                  void main() {
-                     float a = 2.51f;
-                     float b = 0.03f;
-                     float c = 2.43f;
-                     float d = 0.59f;
-                     float e = 0.14f;
-                     OutColor = SMAANeighborhoodBlendingPS(texcoord, offset, colorTex, blendTex);
-                     vec3 x = OutColor.rgb;
-                     OutColor.rgb = clamp((x*(a*x+b))/(x*(c*x+d)+e), vec3(0), vec3(1));
+                     gl_FragColor = SMAANeighborhoodBlendingPS(texcoord, offset, colorTex, blendTex);
                  }"
             }
         }
@@ -209,7 +187,10 @@ pub fn get_shader(
 pub mod raw_miniquad {
     use macroquad::miniquad::*;
 
-    use super::{get_shader, ShaderQuality, ShaderStage};
+    use super::{
+        get_shader, ShaderQuality, ShaderStage, AREATEX_BYTES, AREATEX_HEIGHT, AREATEX_WIDTH,
+        SEARCHTEX_BYTES, SEARCHTEX_HEIGHT, SEARCHTEX_WIDTH,
+    };
 
     #[repr(C)]
     struct Vec2 {
@@ -226,11 +207,15 @@ pub mod raw_miniquad {
     pub struct Stage {
         pub render_pipeline: Pipeline,
         pub render_bindings: Bindings,
-        pub offscreen_pass: RenderPass,
-        pub display_pipeline: Pipeline,
-        pub display_bindings: Bindings,
+        pub render_offscreen_pass: RenderPass,
         pub edge_detect_pipeline: Pipeline,
         pub edge_detect_bindings: Bindings,
+        pub edge_detect_offscreen_pass: RenderPass,
+        pub blend_weight_pipeline: Pipeline,
+        pub blend_weight_bindings: Bindings,
+        pub blend_weight_offscreen_pass: RenderPass,
+        pub neighborhood_blending_pipeline: Pipeline,
+        pub neighborhood_blending_bindings: Bindings,
     }
 
     impl Stage {
@@ -286,61 +271,8 @@ pub mod raw_miniquad {
                 format: TextureFormat::RGBA8,
                 ..Default::default()
             });
-            let depth_img = ctx.new_render_texture(TextureParams {
-                width: 0,
-                height: 0,
-                format: TextureFormat::Depth,
-                ..Default::default()
-            });
 
-            let offscreen_pass = ctx.new_render_pass(color_img, Some(depth_img));
-
-            let vertices: [[f32; 2]; 6] = [
-                [-1., -1.],
-                [-1., 1.],
-                [1., 1.],
-                [1., 1.],
-                [1., -1.],
-                [-1., -1.],
-            ];
-            let vertex_buffer = ctx.new_buffer(
-                BufferType::VertexBuffer,
-                BufferUsage::Immutable,
-                BufferSource::slice(&vertices),
-            );
-
-            let indices: [u16; 6] = [0, 1, 2, 3, 4, 5];
-            let index_buffer = ctx.new_buffer(
-                BufferType::IndexBuffer,
-                BufferUsage::Immutable,
-                BufferSource::slice(&indices),
-            );
-
-            let display_bindings = Bindings {
-                vertex_buffers: vec![vertex_buffer],
-                index_buffer,
-                images: vec![color_img],
-            };
-
-            let display_shader = ctx
-                .new_shader(
-                    ShaderSource::Glsl {
-                        vertex: shader::DISPLAY_VERTEX,
-                        fragment: shader::DISPLAY_FRAGMENT,
-                    },
-                    ShaderMeta {
-                        images: vec!["tex".to_string()],
-                        uniforms: UniformBlockLayout { uniforms: vec![] },
-                    },
-                )
-                .unwrap();
-
-            let display_pipeline = ctx.new_pipeline(
-                &[BufferLayout::default()],
-                &[VertexAttribute::new("in_pos", VertexFormat::Float2)],
-                display_shader,
-                PipelineParams::default(),
-            );
+            let render_offscreen_pass = ctx.new_render_pass(color_img, None);
 
             let vertices: [[f32; 2]; 3] = [[-1., -1.], [-1., 3.], [3., -1.]];
             let vertex_buffer = ctx.new_buffer(
@@ -379,16 +311,126 @@ pub mod raw_miniquad {
                 &[VertexAttribute::new("in_pos", VertexFormat::Float2)],
                 shader,
                 PipelineParams {
-                    color_blend: Some(BlendState::new(
-                        Equation::Add,
-                        BlendFactor::One,
-                        BlendFactor::Zero,
-                    )),
-                    alpha_blend: Some(BlendState::new(
-                        Equation::Add,
-                        BlendFactor::One,
-                        BlendFactor::Zero,
-                    )),
+                    // color_blend: Some(BlendState::new(
+                    //     Equation::Add,
+                    //     BlendFactor::One,
+                    //     BlendFactor::Zero,
+                    // )),
+                    // alpha_blend: Some(BlendState::new(
+                    //     Equation::Add,
+                    //     BlendFactor::One,
+                    //     BlendFactor::Zero,
+                    // )),
+                    ..Default::default()
+                },
+            );
+
+            let edge_detect_offscreen_pass = ctx.new_render_pass(color_img, None);
+            let area_img = ctx.new_texture_from_data_and_format(
+                &AREATEX_BYTES,
+                TextureParams {
+                    kind: TextureKind::Texture2D,
+                    width: AREATEX_WIDTH,
+                    height: AREATEX_HEIGHT,
+                    format: TextureFormat::RGBA8,
+                    wrap: TextureWrap::Clamp,
+                    min_filter: FilterMode::Linear,
+                    mag_filter: FilterMode::Linear,
+                    mipmap_filter: MipmapFilterMode::None,
+                    allocate_mipmaps: false,
+                    sample_count: 0,
+                },
+            );
+            let search_img = ctx.new_texture_from_data_and_format(
+                &SEARCHTEX_BYTES,
+                TextureParams {
+                    kind: TextureKind::Texture2D,
+                    width: SEARCHTEX_WIDTH,
+                    height: SEARCHTEX_HEIGHT,
+                    format: TextureFormat::RGBA8,
+                    wrap: TextureWrap::Clamp,
+                    min_filter: FilterMode::Linear,
+                    mag_filter: FilterMode::Linear,
+                    mipmap_filter: MipmapFilterMode::None,
+                    allocate_mipmaps: false,
+                    sample_count: 0,
+                },
+            );
+            let blend_weight_bindings = Bindings {
+                vertex_buffers: vec![vertex_buffer],
+                index_buffer,
+                images: vec![color_img, area_img, search_img],
+            };
+
+            let shader = get_shader(
+                ctx,
+                ShaderQuality::High,
+                ShaderStage::BlendingWeightVS,
+                ShaderStage::BlendingWeightPS,
+                ShaderMeta {
+                    images: vec![
+                        "edgesTex".to_string(),
+                        "areaTex".to_string(),
+                        "searchTex".to_string(),
+                    ],
+                    uniforms: UniformBlockLayout {
+                        uniforms: vec![UniformDesc::new("u_rt", UniformType::Float4)],
+                    },
+                },
+            );
+            let blend_weight_pipeline = ctx.new_pipeline(
+                &[BufferLayout::default()],
+                &[VertexAttribute::new("in_pos", VertexFormat::Float2)],
+                shader,
+                PipelineParams {
+                    // color_blend: Some(BlendState::new(
+                    //     Equation::Add,
+                    //     BlendFactor::One,
+                    //     BlendFactor::Zero,
+                    // )),
+                    // alpha_blend: Some(BlendState::new(
+                    //     Equation::Add,
+                    //     BlendFactor::One,
+                    //     BlendFactor::Zero,
+                    // )),
+                    ..Default::default()
+                },
+            );
+            let blend_weight_offscreen_pass = ctx.new_render_pass(color_img, None);
+
+            let neighborhood_blending_bindings = Bindings {
+                vertex_buffers: vec![vertex_buffer],
+                index_buffer,
+                images: vec![color_img, color_img],
+            };
+
+            let shader = get_shader(
+                ctx,
+                ShaderQuality::High,
+                ShaderStage::NeighborhoodBlendingVS,
+                ShaderStage::NeighborhoodBlendingPS,
+                ShaderMeta {
+                    images: vec!["colorTex".to_string(), "blendTex".to_string()],
+                    uniforms: UniformBlockLayout {
+                        uniforms: vec![UniformDesc::new("u_rt", UniformType::Float4)],
+                    },
+                },
+            );
+            let neighborhood_blending_pipeline = ctx.new_pipeline(
+                &[BufferLayout::default()],
+                &[VertexAttribute::new("in_pos", VertexFormat::Float2)],
+                shader,
+                PipelineParams {
+                    // color_blend: Some(BlendState::new(
+                    //     Equation::Add,
+                    //     BlendFactor::One,
+                    //     BlendFactor::Zero,
+                    // )),
+                    // alpha_blend: Some(BlendState::new(
+                    //     Equation::Add,
+                    //     BlendFactor::One,
+                    //     BlendFactor::Zero,
+                    // )),
                     ..Default::default()
                 },
             );
@@ -396,11 +438,15 @@ pub mod raw_miniquad {
             Stage {
                 render_pipeline,
                 render_bindings,
-                offscreen_pass,
-                display_pipeline,
-                display_bindings,
+                render_offscreen_pass,
                 edge_detect_pipeline,
                 edge_detect_bindings,
+                edge_detect_offscreen_pass,
+                blend_weight_pipeline,
+                blend_weight_bindings,
+                blend_weight_offscreen_pass,
+                neighborhood_blending_pipeline,
+                neighborhood_blending_bindings,
             }
         }
     }

@@ -58,29 +58,6 @@ async fn main() {
     loop {
         clear_background(LIGHTGRAY);
 
-        if offscreen_width != screen_width() as u32 && offscreen_height != screen_height() as u32 {
-            offscreen_width = screen_width() as u32;
-            offscreen_height = screen_height() as u32;
-            dbg!((offscreen_width, offscreen_height));
-            smaa_stage.offscreen_pass = {
-                let InternalGlContext {
-                    quad_context: ctx, ..
-                } = unsafe { get_internal_gl() };
-                let color_img = ctx.new_render_texture(TextureParams {
-                    width: offscreen_width,
-                    height: offscreen_height,
-                    format: TextureFormat::RGBA8,
-                    ..Default::default()
-                });
-                smaa_stage.edge_detect_bindings.images[0] = color_img;
-
-                let new_offscreen_pass = ctx.new_render_pass(color_img, None);
-
-                ctx.delete_render_pass(smaa_stage.offscreen_pass);
-                new_offscreen_pass
-            };
-        }
-
         // draw_lottie(&model);
 
         // {
@@ -210,21 +187,67 @@ async fn main() {
         // }
 
         {
-            let draw_to_texture = true;
+            if offscreen_width != screen_width() as u32
+                && offscreen_height != screen_height() as u32
+            {
+                offscreen_width = screen_width() as u32;
+                offscreen_height = screen_height() as u32;
+                dbg!((offscreen_width, offscreen_height));
+                {
+                    let InternalGlContext {
+                        quad_context: ctx, ..
+                    } = unsafe { get_internal_gl() };
+                    ctx.delete_render_pass(smaa_stage.render_offscreen_pass);
+                    ctx.delete_render_pass(smaa_stage.edge_detect_offscreen_pass);
+                    ctx.delete_render_pass(smaa_stage.blend_weight_offscreen_pass);
+
+                    let render_img = ctx.new_render_texture(TextureParams {
+                        width: offscreen_width,
+                        height: offscreen_height,
+                        format: TextureFormat::RGBA8,
+                        ..Default::default()
+                    });
+
+                    dbg!(render_img);
+
+                    smaa_stage.render_offscreen_pass = ctx.new_render_pass(render_img, None);
+                    smaa_stage.edge_detect_bindings.images[0] = render_img;
+                    // smaa_stage.blend_weight_bindings.images[0] = render_img;
+                    // smaa_stage.neighborhood_blending_bindings.images[0] = render_img;
+
+                    let edge_detect_img = ctx.new_render_texture(TextureParams {
+                        width: offscreen_width,
+                        height: offscreen_height,
+                        format: TextureFormat::RGBA8,
+                        ..Default::default()
+                    });
+
+                    smaa_stage.edge_detect_offscreen_pass =
+                        ctx.new_render_pass(edge_detect_img, None);
+                    smaa_stage.blend_weight_bindings.images[0] = edge_detect_img;
+
+                    let blend_weight_img = ctx.new_render_texture(TextureParams {
+                        width: offscreen_width,
+                        height: offscreen_height,
+                        format: TextureFormat::RGBA8,
+                        ..Default::default()
+                    });
+                    smaa_stage.blend_weight_offscreen_pass = ctx.new_render_pass(blend_weight_img, None);
+                    smaa_stage.neighborhood_blending_bindings.images[1] = blend_weight_img;
+                };
+            }
 
             let mut gl = unsafe { get_internal_gl() };
 
             // Ensure that macroquad's shapes are not going to be lost
             gl.flush();
 
-            if draw_to_texture {
-                gl.quad_context.begin_pass(
-                    Some(smaa_stage.offscreen_pass),
-                    PassAction::clear_color(0.0, 0.0, 0.0, 0.0),
-                );
-            } else {
-                gl.quad_context.begin_default_pass(PassAction::Nothing);
-            }
+            // gl.quad_context.begin_default_pass(PassAction::clear_color(0.0, 0.0, 0.0, 0.0));
+
+            gl.quad_context.begin_pass(
+                Some(smaa_stage.render_offscreen_pass),
+                PassAction::clear_color(0.0, 0.0, 0.0, 0.0),
+            );
 
             gl.quad_context.apply_pipeline(&smaa_stage.render_pipeline);
             gl.quad_context.apply_bindings(&smaa_stage.render_bindings);
@@ -232,27 +255,71 @@ async fn main() {
             gl.quad_context.draw(0, 3, 1);
             gl.quad_context.end_render_pass();
 
-            if draw_to_texture {
-                gl.quad_context.begin_default_pass(PassAction::Nothing);
+            // gl.quad_context.begin_default_pass(PassAction::clear_color(0.0, 0.0, 0.0, 0.0));
 
-                gl.quad_context
-                    .apply_pipeline(&smaa_stage.edge_detect_pipeline);
-                gl.quad_context
-                    .apply_bindings(&smaa_stage.edge_detect_bindings);
+            gl.quad_context.begin_pass(
+                Some(smaa_stage.edge_detect_offscreen_pass),
+                PassAction::clear_color(0.0, 0.0, 0.0, 0.0),
+            );
 
-                let width = screen_width();
-                let height = screen_height();
-                gl.quad_context
-                    .apply_uniforms(miniquad::UniformsSource::table(
-                        &smaa::raw_miniquad::shader::Uniforms {
-                            u_rt: [1.0 / width, 1.0 / height, width, height],
-                        },
-                    ));
+            gl.quad_context
+                .apply_pipeline(&smaa_stage.edge_detect_pipeline);
+            gl.quad_context
+                .apply_bindings(&smaa_stage.edge_detect_bindings);
 
-                gl.quad_context.draw(0, 3, 1);
+            let width = screen_width();
+            let height = screen_height();
+            gl.quad_context
+                .apply_uniforms(miniquad::UniformsSource::table(
+                    &smaa::raw_miniquad::shader::Uniforms {
+                        u_rt: [1.0 / width, 1.0 / height, width, height],
+                    },
+                ));
+            gl.quad_context.draw(0, 3, 1);
+            gl.quad_context.end_render_pass();
 
-                gl.quad_context.end_render_pass();
-            }
+            // gl.quad_context
+            //     .begin_default_pass(PassAction::clear_color(0.0, 0.0, 0.0, 0.0));
+
+            gl.quad_context.begin_pass(
+                Some(smaa_stage.blend_weight_offscreen_pass),
+                PassAction::clear_color(0.0, 0.0, 0.0, 0.0),
+            );
+
+            gl.quad_context
+                .apply_pipeline(&smaa_stage.blend_weight_pipeline);
+            gl.quad_context
+                .apply_bindings(&smaa_stage.blend_weight_bindings);
+            let width = screen_width();
+            let height = screen_height();
+            gl.quad_context
+                .apply_uniforms(miniquad::UniformsSource::table(
+                    &smaa::raw_miniquad::shader::Uniforms {
+                        u_rt: [1.0 / width, 1.0 / height, width, height],
+                    },
+                ));
+            gl.quad_context.draw(0, 3, 1);
+            gl.quad_context.end_render_pass();
+
+            gl.quad_context.begin_default_pass(PassAction::Nothing);
+
+            gl.quad_context
+                .apply_pipeline(&smaa_stage.neighborhood_blending_pipeline);
+            gl.quad_context
+                .apply_bindings(&smaa_stage.neighborhood_blending_bindings);
+
+            let width = screen_width();
+            let height = screen_height();
+            gl.quad_context
+                .apply_uniforms(miniquad::UniformsSource::table(
+                    &smaa::raw_miniquad::shader::Uniforms {
+                        u_rt: [1.0 / width, 1.0 / height, width, height],
+                    },
+                ));
+
+            gl.quad_context.draw(0, 3, 1);
+
+            gl.quad_context.end_render_pass();
         }
 
         next_frame().await;
