@@ -16,7 +16,7 @@ const OPEN_SANS_TTF: &[u8] = include_bytes!("../fonts/OpenSans-Regular.ttf");
 pub mod raw_miniquad {
     use super::renderer::Shape;
     use super::text::{paths_of_text, Alignment, Layout, Orientation};
-    use super::vertex::{Vertex2f, Vertex3f, Vertex0};
+    use super::vertex::{Vertex0, Vertex2f, Vertex3f};
     use super::OPEN_SANS_TTF;
     use macroquad::miniquad::*;
 
@@ -205,7 +205,6 @@ pub mod raw_miniquad {
                 },
             );
 
-
             let begin_offset: usize = shape2.vertex_offsets[2];
             let end_offset = shape2.vertex_offsets[3];
             let vertices = &shape2.vertex_buffer[begin_offset..end_offset];
@@ -324,9 +323,7 @@ pub mod raw_miniquad {
                 .unwrap();
             let color_cover_pipeline = ctx.new_pipeline(
                 &[BufferLayout::default()],
-                &[
-                    VertexAttribute::new("position", VertexFormat::Float2),
-                ],
+                &[VertexAttribute::new("position", VertexFormat::Float2)],
                 color_cover_shader,
                 PipelineParams {
                     primitive_type: PrimitiveType::Triangles,
@@ -440,7 +437,7 @@ void main() {
     }
 "#;
 
-pub const QUADRATIC_VERTEX: &str = r#"#version 100
+        pub const QUADRATIC_VERTEX: &str = r#"#version 100
 precision lowp float;
 
 uniform vec4 transform_row_0;
