@@ -311,16 +311,16 @@ pub mod raw_miniquad {
                 &[VertexAttribute::new("in_pos", VertexFormat::Float2)],
                 shader,
                 PipelineParams {
-                    // color_blend: Some(BlendState::new(
-                    //     Equation::Add,
-                    //     BlendFactor::One,
-                    //     BlendFactor::Zero,
-                    // )),
-                    // alpha_blend: Some(BlendState::new(
-                    //     Equation::Add,
-                    //     BlendFactor::One,
-                    //     BlendFactor::Zero,
-                    // )),
+                    color_blend: Some(BlendState::new(
+                        Equation::Add,
+                        BlendFactor::One,
+                        BlendFactor::Zero,
+                    )),
+                    alpha_blend: Some(BlendState::new(
+                        Equation::Add,
+                        BlendFactor::One,
+                        BlendFactor::Zero,
+                    )),
                     ..Default::default()
                 },
             );
@@ -383,16 +383,16 @@ pub mod raw_miniquad {
                 &[VertexAttribute::new("in_pos", VertexFormat::Float2)],
                 shader,
                 PipelineParams {
-                    // color_blend: Some(BlendState::new(
-                    //     Equation::Add,
-                    //     BlendFactor::One,
-                    //     BlendFactor::Zero,
-                    // )),
-                    // alpha_blend: Some(BlendState::new(
-                    //     Equation::Add,
-                    //     BlendFactor::One,
-                    //     BlendFactor::Zero,
-                    // )),
+                    color_blend: Some(BlendState::new(
+                        Equation::Add,
+                        BlendFactor::Value(BlendValue::SourceAlpha),
+                        BlendFactor::OneMinusValue(BlendValue::SourceAlpha),
+                    )),
+                    alpha_blend: Some(BlendState::new(
+                        Equation::Add,
+                        BlendFactor::Value(BlendValue::SourceAlpha),
+                        BlendFactor::OneMinusValue(BlendValue::SourceAlpha),
+                    )),
                     ..Default::default()
                 },
             );
@@ -421,16 +421,16 @@ pub mod raw_miniquad {
                 &[VertexAttribute::new("in_pos", VertexFormat::Float2)],
                 shader,
                 PipelineParams {
-                    // color_blend: Some(BlendState::new(
-                    //     Equation::Add,
-                    //     BlendFactor::One,
-                    //     BlendFactor::Zero,
-                    // )),
-                    // alpha_blend: Some(BlendState::new(
-                    //     Equation::Add,
-                    //     BlendFactor::One,
-                    //     BlendFactor::Zero,
-                    // )),
+                    color_blend: Some(BlendState::new(
+                        Equation::Add,
+                        BlendFactor::One,
+                        BlendFactor::Zero,
+                    )),
+                    alpha_blend: Some(BlendState::new(
+                        Equation::Add,
+                        BlendFactor::One,
+                        BlendFactor::Zero,
+                    )),
                     ..Default::default()
                 },
             );
@@ -478,22 +478,6 @@ pub mod raw_miniquad {
                 uniforms: UniformBlockLayout { uniforms: vec![] },
             }
         }
-
-        pub const DISPLAY_VERTEX: &str = r#"
-            #version 100
-            attribute vec2 in_pos;
-
-            void main() {
-                gl_Position = vec4(in_pos, 0, 1);
-            }"#;
-
-        pub const DISPLAY_FRAGMENT: &str = r#"
-            #version 100
-            uniform sampler2D tex;
-
-            void main() {
-                gl_FragColor = vec4(texture2D(tex, vec2(gl_FragCoord.x / 800.0, gl_FragCoord.y / 600.0)).xyz, 1.0);
-            }"#;
 
         #[repr(C)]
         pub struct Uniforms {
