@@ -13,3 +13,4 @@ I try to use lottie animations in there. I wanted to use lottie-rs but there are
 - https://handmade.network/forums/t/8799-anti-aliasing_in_fragment_shader
 - https://www.shadertoy.com/view/DtXcRr
 - https://shadertoyunofficial.wordpress.com/2019/01/02/programming-tricks-in-shadertoy-glsl/
+- https://github.com/fintelia/smaa-rs
