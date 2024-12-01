@@ -9,7 +9,7 @@ use {
         GeometricProduct, One,
     },
     macroquad::prelude::*,
-    miniquad::{PassAction, TextureFormat, TextureParams},
+    miniquad::{window::screen_size, PassAction, TextureFormat, TextureParams},
     path_rendering::{
         raw_miniquad,
         utils::{matrix_multiplication, motor3d_to_mat4, perspective_projection},
@@ -70,8 +70,8 @@ async fn main() {
             if offscreen_width != screen_width() as u32
                 && offscreen_height != screen_height() as u32
             {
-                offscreen_width = screen_width() as u32;
-                offscreen_height = screen_height() as u32;
+                offscreen_width = screen_size().0 as u32;
+                offscreen_height = screen_size().1 as u32;
                 dbg!((offscreen_width, offscreen_height));
                 {
                     let InternalGlContext {
