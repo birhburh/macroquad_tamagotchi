@@ -609,7 +609,6 @@ SamplerState PointSampler { Filter = MIN_MAG_MIP_POINT; AddressU = Clamp; Addres
 
 #if defined(SMAA_GLSL_2) || defined(SMAA_GLSL_ES2)
 #define SMAARound(v) floor((v) + .5)
-#define SMAAOffset(x,y) vec2(x,y)
 #else
 #define SMAARound(v) round(v)
 #endif
@@ -641,9 +640,14 @@ SamplerState PointSampler { Filter = MIN_MAG_MIP_POINT; AddressU = Clamp; Addres
 #define SMAA_OFFSET_USE (*offset)
 #define SMAA_DISCARD discard_fragment()
 #else
-#define SMAAOffset(x,y) int2(x,y)
 
-#define SMAAInOut(type) inout float4 offset[3]
+#if defined(SMAA_GLSL_2) || defined(SMAA_GLSL_ES2)
+#define SMAAOffset(x,y) vec2(x,y)
+#else
+#define SMAAOffset(x,y) int2(x,y)
+#endif
+
+#define SMAAInOut(type) inout type
 #define SMAAInOutPass(var) var
 #define SMAAInOutUse(var) var
 #define SMAA_RT_ARG
