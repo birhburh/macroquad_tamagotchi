@@ -158,11 +158,10 @@ impl ShaderStage {
                 struct RasterizerData
                 {
                     float4 position [[position]];
-                    float2 uv       [[user(locn0)]];
-                    float4 offset0 [[user(loc1)]];
-                    float4 offset1 [[user(loc2)]];
-                    float4 offset2 [[user(loc3)]];
-                    float2 texcoord [[user(loc4)]];
+                    float4 offset0 [[user(loc0)]];
+                    float4 offset1 [[user(loc1)]];
+                    float4 offset2 [[user(loc2)]];
+                    float2 texcoord [[user(loc3)]];
                 };
 
                 vertex RasterizerData vertexShader(
@@ -171,7 +170,7 @@ impl ShaderStage {
                 {
                      RasterizerData out;
                      out.position = float4(v.in_pos, 1.0, 1.0);
-                     out.texcoord = out.position.xy * float2(0.5, 0.5) + float2(0.5);
+                     out.texcoord = out.position.xy * float2(0.5, -0.5) + float2(0.5);
                      float4 offset[3];
                      SMAAEdgeDetectionVS(uniforms.rt, out.texcoord, &offset);
                      out.offset0=offset[0];
@@ -194,7 +193,103 @@ impl ShaderStage {
                     return float4(SMAALumaEdgeDetectionPS(uniforms.rt, in.texcoord, offset, colorTex, colorTexSmplr), 0.0, 1.0);
                  }"
             },
-            _ => unimplemented!()
+            ShaderStage::BlendingWeightVS => {
+                "
+                 struct Vertex
+                {
+                    float2 in_pos   [[attribute(0)]];
+                };
+
+                struct RasterizerData
+                {
+                    float4 position [[position]];
+                    float2 pixcoord [[user(loc0)]];
+                    float4 offset0 [[user(loc1)]];
+                    float4 offset1 [[user(loc2)]];
+                    float4 offset2 [[user(loc3)]];
+                    float2 texcoord [[user(loc4)]];
+                };
+
+                vertex RasterizerData vertexShader(
+                    Vertex v [[stage_in]],
+                    constant Uniforms& uniforms [[buffer(0)]])
+                {
+                    RasterizerData out;
+                    out.position = float4(v.in_pos, 1.0, 1.0);
+                    out.texcoord = out.position.xy * float2(0.5, -0.5) + float2(0.5);
+                    float4 offset[3];
+                    SMAABlendingWeightCalculationVS(uniforms.rt, out.texcoord, &out.pixcoord, &offset);
+                    out.offset0=offset[0];
+                    out.offset1=offset[1];
+                    out.offset2=offset[2];
+                    return out;
+                }"
+            }
+            ShaderStage::BlendingWeightPS => {
+                "
+                fragment float4 fragmentShader(
+                    RasterizerData in [[stage_in]],
+                    constant Uniforms& uniforms [[buffer(0)]],
+                    texture2d<float> edgesTex [[texture(0)]],
+                    sampler edgesTexSmplr [[sampler(0)]],
+                    texture2d<float> areaTex [[texture(1)]],
+                    sampler areaTexSmplr [[sampler(1)]],
+                    texture2d<float> searchTex [[texture(2)]],
+                    sampler searchTexSmplr [[sampler(2)]])
+                 {
+                    float4 subsampleIndices = float4(0);
+                    float4 offset[3];
+                    offset[0] = in.offset0;
+                    offset[1] = in.offset1;
+                    offset[2] = in.offset2;
+                    return SMAABlendingWeightCalculationPS(uniforms.rt, in.texcoord, in.pixcoord,
+                                                           offset, edgesTex, edgesTexSmplr,
+                                                           areaTex, areaTexSmplr,
+                                                           searchTex, searchTexSmplr,
+                                                           subsampleIndices);
+                 }"
+            }
+            ShaderStage::NeighborhoodBlendingVS => {
+                "
+                struct Vertex
+                {
+                    float2 in_pos   [[attribute(0)]];
+                };
+
+                struct RasterizerData
+                {
+                    float4 position [[position]];
+                    float4 offset [[user(loc0)]];
+                    float2 texcoord [[user(loc1)]];
+                };
+
+                vertex RasterizerData vertexShader(
+                    Vertex v [[stage_in]],
+                    constant Uniforms& uniforms [[buffer(0)]])
+                {
+                    RasterizerData out;
+                    out.position = float4(v.in_pos, 1.0, 1.0);
+                    out.texcoord = out.position.xy * float2(0.5, -0.5) + float2(0.5);
+                    SMAANeighborhoodBlendingVS(uniforms.rt, out.texcoord, &out.offset);
+                    return out;
+                 }"
+            }
+            ShaderStage::NeighborhoodBlendingPS => {
+                "
+                fragment float4 fragmentShader(
+                    RasterizerData in [[stage_in]],
+                    constant Uniforms& uniforms [[buffer(0)]],
+                    texture2d<float> colorTex [[texture(0)]],
+                    sampler colorTexSmplr [[sampler(0)]],
+                    texture2d<float> blendTex [[texture(1)]],
+                    sampler blendTexSmplr [[sampler(1)]])
+                {
+                    return SMAANeighborhoodBlendingPS(uniforms.rt, in.texcoord, in.offset,
+                                                      colorTex, colorTexSmplr,
+                                                      blendTex, blendTexSmplr);
+                }
+                "
+            }
         }
     }
 }
@@ -290,12 +385,12 @@ pub mod raw_miniquad {
         pub render_offscreen_pass: RenderPass,
         pub edge_detect_pipeline: Pipeline,
         pub edge_detect_bindings: Bindings,
-        // pub edge_detect_offscreen_pass: RenderPass,
-        // pub blend_weight_pipeline: Pipeline,
-        // pub blend_weight_bindings: Bindings,
-        // pub blend_weight_offscreen_pass: RenderPass,
-        // pub neighborhood_blending_pipeline: Pipeline,
-        // pub neighborhood_blending_bindings: Bindings,
+        pub edge_detect_offscreen_pass: RenderPass,
+        pub blend_weight_pipeline: Pipeline,
+        pub blend_weight_bindings: Bindings,
+        pub blend_weight_offscreen_pass: RenderPass,
+        pub neighborhood_blending_pipeline: Pipeline,
+        pub neighborhood_blending_bindings: Bindings,
     }
 
     impl Stage {
@@ -410,115 +505,115 @@ pub mod raw_miniquad {
                 },
             );
 
-            // let edge_detect_offscreen_pass = ctx.new_render_pass(color_img, None);
-            // let area_img = ctx.new_texture_from_data_and_format(
-            //     &AREATEX_BYTES,
-            //     TextureParams {
-            //         kind: TextureKind::Texture2D,
-            //         width: AREATEX_WIDTH,
-            //         height: AREATEX_HEIGHT,
-            //         format: TextureFormat::RGBA8,
-            //         wrap: TextureWrap::Clamp,
-            //         min_filter: FilterMode::Linear,
-            //         mag_filter: FilterMode::Linear,
-            //         mipmap_filter: MipmapFilterMode::None,
-            //         allocate_mipmaps: false,
-            //         sample_count: 0,
-            //     },
-            // );
-            // let search_img = ctx.new_texture_from_data_and_format(
-            //     &SEARCHTEX_BYTES,
-            //     TextureParams {
-            //         kind: TextureKind::Texture2D,
-            //         width: SEARCHTEX_WIDTH,
-            //         height: SEARCHTEX_HEIGHT,
-            //         format: TextureFormat::RGBA8,
-            //         wrap: TextureWrap::Clamp,
-            //         min_filter: FilterMode::Linear,
-            //         mag_filter: FilterMode::Linear,
-            //         mipmap_filter: MipmapFilterMode::None,
-            //         allocate_mipmaps: false,
-            //         sample_count: 0,
-            //     },
-            // );
-            // let blend_weight_bindings = Bindings {
-            //     vertex_buffers: vec![vertex_buffer],
-            //     index_buffer,
-            //     images: vec![color_img, area_img, search_img],
-            // };
+            let edge_detect_offscreen_pass = ctx.new_render_pass(color_img, None);
+            let area_img = ctx.new_texture_from_data_and_format(
+                &AREATEX_BYTES,
+                TextureParams {
+                    kind: TextureKind::Texture2D,
+                    width: AREATEX_WIDTH,
+                    height: AREATEX_HEIGHT,
+                    format: TextureFormat::RGBA8,
+                    wrap: TextureWrap::Clamp,
+                    min_filter: FilterMode::Linear,
+                    mag_filter: FilterMode::Linear,
+                    mipmap_filter: MipmapFilterMode::None,
+                    allocate_mipmaps: false,
+                    sample_count: 0,
+                },
+            );
+            let search_img = ctx.new_texture_from_data_and_format(
+                &SEARCHTEX_BYTES,
+                TextureParams {
+                    kind: TextureKind::Texture2D,
+                    width: SEARCHTEX_WIDTH,
+                    height: SEARCHTEX_HEIGHT,
+                    format: TextureFormat::RGBA8,
+                    wrap: TextureWrap::Clamp,
+                    min_filter: FilterMode::Linear,
+                    mag_filter: FilterMode::Linear,
+                    mipmap_filter: MipmapFilterMode::None,
+                    allocate_mipmaps: false,
+                    sample_count: 0,
+                },
+            );
+            let blend_weight_bindings = Bindings {
+                vertex_buffers: vec![vertex_buffer],
+                index_buffer,
+                images: vec![color_img, area_img, search_img],
+            };
 
-            // let shader = get_shader(
-            //     ctx,
-            //     ShaderQuality::High,
-            //     ShaderStage::BlendingWeightVS,
-            //     ShaderStage::BlendingWeightPS,
-            //     ShaderMeta {
-            //         images: vec![
-            //             "edgesTex".to_string(),
-            //             "areaTex".to_string(),
-            //             "searchTex".to_string(),
-            //         ],
-            //         uniforms: UniformBlockLayout {
-            //             uniforms: vec![UniformDesc::new("u_rt", UniformType::Float4)],
-            //         },
-            //     },
-            // );
-            // let blend_weight_pipeline = ctx.new_pipeline(
-            //     &[BufferLayout::default()],
-            //     &[VertexAttribute::new("in_pos", VertexFormat::Float2)],
-            //     shader,
-            //     PipelineParams {
-            //         color_blend: Some(BlendState::new(
-            //             Equation::Add,
-            //             BlendFactor::Value(BlendValue::SourceAlpha),
-            //             BlendFactor::OneMinusValue(BlendValue::SourceAlpha),
-            //         )),
-            //         alpha_blend: Some(BlendState::new(
-            //             Equation::Add,
-            //             BlendFactor::Value(BlendValue::SourceAlpha),
-            //             BlendFactor::OneMinusValue(BlendValue::SourceAlpha),
-            //         )),
-            //         ..Default::default()
-            //     },
-            // );
-            // let blend_weight_offscreen_pass = ctx.new_render_pass(color_img, None);
+            let shader = get_shader(
+                ctx,
+                ShaderQuality::High,
+                ShaderStage::BlendingWeightVS,
+                ShaderStage::BlendingWeightPS,
+                ShaderMeta {
+                    images: vec![
+                        "edgesTex".to_string(),
+                        "areaTex".to_string(),
+                        "searchTex".to_string(),
+                    ],
+                    uniforms: UniformBlockLayout {
+                        uniforms: vec![UniformDesc::new("u_rt", UniformType::Float4)],
+                    },
+                },
+            );
+            let blend_weight_pipeline = ctx.new_pipeline(
+                &[BufferLayout::default()],
+                &[VertexAttribute::new("in_pos", VertexFormat::Float2)],
+                shader,
+                PipelineParams {
+                    color_blend: Some(BlendState::new(
+                        Equation::Add,
+                        BlendFactor::Value(BlendValue::SourceAlpha),
+                        BlendFactor::OneMinusValue(BlendValue::SourceAlpha),
+                    )),
+                    alpha_blend: Some(BlendState::new(
+                        Equation::Add,
+                        BlendFactor::Value(BlendValue::SourceAlpha),
+                        BlendFactor::OneMinusValue(BlendValue::SourceAlpha),
+                    )),
+                    ..Default::default()
+                },
+            );
+            let blend_weight_offscreen_pass = ctx.new_render_pass(color_img, None);
 
-            // let neighborhood_blending_bindings = Bindings {
-            //     vertex_buffers: vec![vertex_buffer],
-            //     index_buffer,
-            //     images: vec![color_img, color_img],
-            // };
+            let neighborhood_blending_bindings = Bindings {
+                vertex_buffers: vec![vertex_buffer],
+                index_buffer,
+                images: vec![color_img, color_img],
+            };
 
-            // let shader = get_shader(
-            //     ctx,
-            //     ShaderQuality::High,
-            //     ShaderStage::NeighborhoodBlendingVS,
-            //     ShaderStage::NeighborhoodBlendingPS,
-            //     ShaderMeta {
-            //         images: vec!["colorTex".to_string(), "blendTex".to_string()],
-            //         uniforms: UniformBlockLayout {
-            //             uniforms: vec![UniformDesc::new("u_rt", UniformType::Float4)],
-            //         },
-            //     },
-            // );
-            // let neighborhood_blending_pipeline = ctx.new_pipeline(
-            //     &[BufferLayout::default()],
-            //     &[VertexAttribute::new("in_pos", VertexFormat::Float2)],
-            //     shader,
-            //     PipelineParams {
-            //         color_blend: Some(BlendState::new(
-            //             Equation::Add,
-            //             BlendFactor::One,
-            //             BlendFactor::Zero,
-            //         )),
-            //         alpha_blend: Some(BlendState::new(
-            //             Equation::Add,
-            //             BlendFactor::One,
-            //             BlendFactor::Zero,
-            //         )),
-            //         ..Default::default()
-            //     },
-            // );
+            let shader = get_shader(
+                ctx,
+                ShaderQuality::High,
+                ShaderStage::NeighborhoodBlendingVS,
+                ShaderStage::NeighborhoodBlendingPS,
+                ShaderMeta {
+                    images: vec!["colorTex".to_string(), "blendTex".to_string()],
+                    uniforms: UniformBlockLayout {
+                        uniforms: vec![UniformDesc::new("u_rt", UniformType::Float4)],
+                    },
+                },
+            );
+            let neighborhood_blending_pipeline = ctx.new_pipeline(
+                &[BufferLayout::default()],
+                &[VertexAttribute::new("in_pos", VertexFormat::Float2)],
+                shader,
+                PipelineParams {
+                    color_blend: Some(BlendState::new(
+                        Equation::Add,
+                        BlendFactor::One,
+                        BlendFactor::Zero,
+                    )),
+                    alpha_blend: Some(BlendState::new(
+                        Equation::Add,
+                        BlendFactor::One,
+                        BlendFactor::Zero,
+                    )),
+                    ..Default::default()
+                },
+            );
 
             Stage {
                 render_pipeline,
@@ -526,12 +621,12 @@ pub mod raw_miniquad {
                 render_offscreen_pass,
                 edge_detect_pipeline,
                 edge_detect_bindings,
-                // edge_detect_offscreen_pass,
-                // blend_weight_pipeline,
-                // blend_weight_bindings,
-                // blend_weight_offscreen_pass,
-                // neighborhood_blending_pipeline,
-                // neighborhood_blending_bindings,
+                edge_detect_offscreen_pass,
+                blend_weight_pipeline,
+                blend_weight_bindings,
+                blend_weight_offscreen_pass,
+                neighborhood_blending_pipeline,
+                neighborhood_blending_bindings,
             }
         }
     }
