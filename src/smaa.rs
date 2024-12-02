@@ -8,6 +8,7 @@ use macroquad::{miniquad::*, prelude::ShaderSource};
 use search_tex::*;
 
 #[allow(dead_code)]
+#[derive(Copy, Clone)]
 pub enum ShaderQuality {
     Low,
     Medium,
@@ -395,6 +396,7 @@ pub mod raw_miniquad {
 
     impl Stage {
         pub fn new(ctx: &mut dyn RenderingBackend) -> Stage {
+            let quality = ShaderQuality::Low;
             #[rustfmt::skip]
             let vertices: [Vertex; 3] = [
                 Vertex { pos : [ -0.5, -0.5 ], color: [1., 0., 0., 1.] },
@@ -476,7 +478,7 @@ pub mod raw_miniquad {
 
             let shader = get_shader(
                 ctx,
-                ShaderQuality::High,
+                quality,
                 ShaderStage::EdgeDetectionVS,
                 ShaderStage::LumaEdgeDetectionPS,
                 ShaderMeta {
@@ -544,7 +546,7 @@ pub mod raw_miniquad {
 
             let shader = get_shader(
                 ctx,
-                ShaderQuality::High,
+                quality,
                 ShaderStage::BlendingWeightVS,
                 ShaderStage::BlendingWeightPS,
                 ShaderMeta {
@@ -586,7 +588,7 @@ pub mod raw_miniquad {
 
             let shader = get_shader(
                 ctx,
-                ShaderQuality::High,
+                quality,
                 ShaderStage::NeighborhoodBlendingVS,
                 ShaderStage::NeighborhoodBlendingPS,
                 ShaderMeta {
