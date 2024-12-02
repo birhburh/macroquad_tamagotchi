@@ -9,7 +9,7 @@ use {
         GeometricProduct, One,
     },
     macroquad::prelude::*,
-    miniquad::{window::screen_size, PassAction, TextureFormat, TextureParams},
+    miniquad::{window::screen_size, MipmapFilterMode, PassAction, TextureFormat, TextureParams},
     path_rendering::{
         raw_miniquad,
         utils::{matrix_multiplication, motor3d_to_mat4, perspective_projection},
@@ -67,8 +67,8 @@ async fn main() {
             // Ensure that macroquad's shapes are not going to be lost
             gl.flush();
 
-            if offscreen_width != screen_width() as u32
-                && offscreen_height != screen_height() as u32
+            if offscreen_width != screen_size().0 as u32
+                && offscreen_height != screen_size().1 as u32
             {
                 offscreen_width = screen_size().0 as u32;
                 offscreen_height = screen_size().1 as u32;
@@ -98,6 +98,11 @@ async fn main() {
                         format: TextureFormat::RGBA8,
                         ..Default::default()
                     });
+                    ctx.texture_set_filter(
+                        edge_detect_img,
+                        FilterMode::Linear,
+                        MipmapFilterMode::Nearest,
+                    );
 
                     smaa_stage.edge_detect_offscreen_pass =
                         ctx.new_render_pass(edge_detect_img, None);
@@ -109,9 +114,26 @@ async fn main() {
                         format: TextureFormat::RGBA8,
                         ..Default::default()
                     });
+                    ctx.texture_set_filter(
+                        blend_weight_img,
+                        FilterMode::Linear,
+                        MipmapFilterMode::Nearest,
+                    );
                     smaa_stage.blend_weight_offscreen_pass =
                         ctx.new_render_pass(blend_weight_img, None);
                     smaa_stage.neighborhood_blending_bindings.images[1] = blend_weight_img;
+
+                    let neighborhood_blending_img = ctx.new_render_texture(TextureParams {
+                        width: offscreen_width,
+                        height: offscreen_height,
+                        format: TextureFormat::RGBA8,
+                        ..Default::default()
+                    });
+                    ctx.texture_set_filter(
+                        neighborhood_blending_img,
+                        FilterMode::Linear,
+                        MipmapFilterMode::Nearest,
+                    );
                 };
             }
 
@@ -269,13 +291,12 @@ async fn main() {
             gl.quad_context
                 .apply_bindings(&smaa_stage.edge_detect_bindings);
 
-            let width = screen_width();
-            let height = screen_height();
+            let width = screen_size().0;
+            let height = screen_size().1;
+            let u_rt = [1.0 / width, 1.0 / height, width, height];
             gl.quad_context
                 .apply_uniforms(miniquad::UniformsSource::table(
-                    &smaa::raw_miniquad::shader::Uniforms {
-                        u_rt: [1.0 / width, 1.0 / height, width, height],
-                    },
+                    &smaa::raw_miniquad::shader::Uniforms { u_rt },
                 ));
             gl.quad_context.draw(0, 3, 1);
             gl.quad_context.end_render_pass();
@@ -292,13 +313,9 @@ async fn main() {
                 .apply_pipeline(&smaa_stage.blend_weight_pipeline);
             gl.quad_context
                 .apply_bindings(&smaa_stage.blend_weight_bindings);
-            let width = screen_width();
-            let height = screen_height();
             gl.quad_context
                 .apply_uniforms(miniquad::UniformsSource::table(
-                    &smaa::raw_miniquad::shader::Uniforms {
-                        u_rt: [1.0 / width, 1.0 / height, width, height],
-                    },
+                    &smaa::raw_miniquad::shader::Uniforms { u_rt },
                 ));
             gl.quad_context.draw(0, 3, 1);
             gl.quad_context.end_render_pass();
@@ -310,13 +327,9 @@ async fn main() {
             gl.quad_context
                 .apply_bindings(&smaa_stage.neighborhood_blending_bindings);
 
-            let width = screen_width();
-            let height = screen_height();
             gl.quad_context
                 .apply_uniforms(miniquad::UniformsSource::table(
-                    &smaa::raw_miniquad::shader::Uniforms {
-                        u_rt: [1.0 / width, 1.0 / height, width, height],
-                    },
+                    &smaa::raw_miniquad::shader::Uniforms { u_rt },
                 ));
 
             gl.quad_context.draw(0, 3, 1);

@@ -620,11 +620,11 @@ SamplerState PointSampler { Filter = MIN_MAG_MIP_POINT; AddressU = Clamp; Addres
 #endif
 
 #if defined(SMAA_METAL)
-#define mad(a, b, c) (a * b + c)
+#define mad(a, b, c) fma(a, b, c)
 #define SMAATexture2D(tex) texture2d<float> tex, sampler tex ## Smplr
-#define SMAASamplePoint(tex, coord) tex.sample(tex ## Smplr, coord)
+#define SMAASamplePoint(tex, coord) tex.sample(tex ## Smplr, coord, level(0.0))
 #define SMAASample(tex, coord) tex.sample(tex ## Smplr, coord)
-#define SMAASampleLevelZero(tex, coord) tex.sample(tex ## Smplr, coord)
+#define SMAASampleLevelZero(tex, coord) tex.sample(tex ## Smplr, coord, level(0.0))
 #define SMAASampleLevelZeroOffset(tex, coord, offset) tex.sample(tex ## Smplr, coord + offset * SMAA_RT_METRICS.xy)
 #define SMAA_FLATTEN
 #define SMAA_BRANCH

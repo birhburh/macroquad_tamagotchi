@@ -565,13 +565,13 @@ pub mod raw_miniquad {
                 PipelineParams {
                     color_blend: Some(BlendState::new(
                         Equation::Add,
-                        BlendFactor::Value(BlendValue::SourceAlpha),
-                        BlendFactor::OneMinusValue(BlendValue::SourceAlpha),
+                        BlendFactor::One,
+                        BlendFactor::Zero,
                     )),
                     alpha_blend: Some(BlendState::new(
                         Equation::Add,
-                        BlendFactor::Value(BlendValue::SourceAlpha),
-                        BlendFactor::OneMinusValue(BlendValue::SourceAlpha),
+                        BlendFactor::One,
+                        BlendFactor::Zero,
                     )),
                     ..Default::default()
                 },
