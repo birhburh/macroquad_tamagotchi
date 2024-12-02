@@ -299,7 +299,7 @@ fn get_opengl_stage(quality: &ShaderQuality, stage: ShaderStage) -> String {
     format!(
         "#version 100
         precision lowp float;
-        #define SMAA_GLSL_2
+        #define SMAA_GLSL_ES2
         #define SMAA_PRESET_{0}
         #define SMAA_INCLUDE_{1} 0
         #define SMAA_RT_METRICS u_rt

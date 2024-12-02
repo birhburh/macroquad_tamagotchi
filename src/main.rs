@@ -22,8 +22,8 @@ fn window_conf() -> Conf {
     Conf {
         window_title: format!("Lottie Example (sample_count = {sample_count})").to_owned(),
         platform: miniquad::conf::Platform {
-            // apple_gfx_api: miniquad::conf::AppleGfxApi::OpenGl,
-            apple_gfx_api: miniquad::conf::AppleGfxApi::Metal,
+            apple_gfx_api: miniquad::conf::AppleGfxApi::OpenGl,
+            // apple_gfx_api: miniquad::conf::AppleGfxApi::Metal,
             ..Default::default()
         },
         // high_dpi: true,
@@ -63,15 +63,15 @@ async fn main() {
 
         {
             let mut gl = unsafe { get_internal_gl() };
+            let width = screen_size().0 as u32;
+            let height = screen_size().1 as u32;
 
             // Ensure that macroquad's shapes are not going to be lost
             gl.flush();
 
-            if offscreen_width != screen_size().0 as u32
-                && offscreen_height != screen_size().1 as u32
-            {
-                offscreen_width = screen_size().0 as u32;
-                offscreen_height = screen_size().1 as u32;
+            if offscreen_width != width && offscreen_height != height {
+                offscreen_width = width;
+                offscreen_height = height;
                 dbg!((offscreen_width, offscreen_height));
                 {
                     let InternalGlContext {
@@ -291,9 +291,7 @@ async fn main() {
             gl.quad_context
                 .apply_bindings(&smaa_stage.edge_detect_bindings);
 
-            let width = screen_size().0;
-            let height = screen_size().1;
-            let u_rt = [1.0 / width, 1.0 / height, width, height];
+            let u_rt = [1.0 / width as f32, 1.0 / height as f32, width as f32, height as f32];
             gl.quad_context
                 .apply_uniforms(miniquad::UniformsSource::table(
                     &smaa::raw_miniquad::shader::Uniforms { u_rt },
