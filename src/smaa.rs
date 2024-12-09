@@ -396,7 +396,7 @@ pub mod raw_miniquad {
 
     impl Stage {
         pub fn new(ctx: &mut dyn RenderingBackend) -> Stage {
-            let quality = ShaderQuality::Low;
+            let quality = ShaderQuality::High;
             #[rustfmt::skip]
             let vertices: [Vertex; 3] = [
                 Vertex { pos : [ -0.5, -0.5 ], color: [1., 0., 0., 1.] },
