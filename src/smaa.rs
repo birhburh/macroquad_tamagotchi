@@ -369,12 +369,6 @@ pub mod raw_miniquad {
     };
 
     #[repr(C)]
-    struct Vec2 {
-        x: f32,
-        y: f32,
-    }
-
-    #[repr(C)]
     struct Vertex {
         pos: [f32; 2],
         color: [f32; 4],
@@ -451,6 +445,9 @@ pub mod raw_miniquad {
                 width: 1,
                 height: 1,
                 format: TextureFormat::RGBA8,
+                min_filter: FilterMode::Linear,
+                mag_filter: FilterMode::Linear,
+                mipmap_filter: MipmapFilterMode::None,
                 ..Default::default()
             });
 

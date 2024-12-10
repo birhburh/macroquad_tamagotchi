@@ -19,11 +19,14 @@ use {
 
 fn window_conf() -> Conf {
     let sample_count = 1;
-    let apple_gfx_api = miniquad::conf::AppleGfxApi::Metal;
-    // let apple_gfx_api = miniquad::conf::AppleGfxApi::OpenGl;
+    // let apple_gfx_api = miniquad::conf::AppleGfxApi::Metal;
+    let apple_gfx_api = miniquad::conf::AppleGfxApi::OpenGl;
     let high_dpi = true;
     Conf {
-        window_title: format!("SMAA Example (high_dpi = {high_dpi}, apple_gfx_api={apple_gfx_api:?})").to_owned(),
+        window_title: format!(
+            "SMAA Example (high_dpi = {high_dpi}, apple_gfx_api={apple_gfx_api:?})"
+        )
+        .to_owned(),
         platform: miniquad::conf::Platform {
             apple_gfx_api,
             ..Default::default()
@@ -68,7 +71,12 @@ async fn main() {
             let mut gl = unsafe { get_internal_gl() };
             let width = screen_size().0 as u32;
             let height = screen_size().1 as u32;
-            let u_rt = [1.0 / width as f32, 1.0 / height as f32, width as f32, height as f32];
+            let u_rt = [
+                1.0 / width as f32,
+                1.0 / height as f32,
+                width as f32,
+                height as f32,
+            ];
 
             // Ensure that macroquad's shapes are not going to be lost
             gl.flush();
@@ -89,6 +97,9 @@ async fn main() {
                         width: offscreen_width,
                         height: offscreen_height,
                         format: TextureFormat::RGBA8,
+                        min_filter: FilterMode::Linear,
+                        mag_filter: FilterMode::Linear,
+                        mipmap_filter: MipmapFilterMode::None,
                         ..Default::default()
                     });
 
@@ -100,13 +111,11 @@ async fn main() {
                         width: offscreen_width,
                         height: offscreen_height,
                         format: TextureFormat::RGBA8,
+                        min_filter: FilterMode::Linear,
+                        mag_filter: FilterMode::Linear,
+                        mipmap_filter: MipmapFilterMode::None,
                         ..Default::default()
                     });
-                    ctx.texture_set_filter(
-                        edge_detect_img,
-                        FilterMode::Linear,
-                        MipmapFilterMode::Nearest,
-                    );
 
                     smaa_stage.edge_detect_offscreen_pass =
                         ctx.new_render_pass(edge_detect_img, None);
@@ -116,28 +125,14 @@ async fn main() {
                         width: offscreen_width,
                         height: offscreen_height,
                         format: TextureFormat::RGBA8,
+                        min_filter: FilterMode::Linear,
+                        mag_filter: FilterMode::Linear,
+                        mipmap_filter: MipmapFilterMode::None,
                         ..Default::default()
                     });
-                    ctx.texture_set_filter(
-                        blend_weight_img,
-                        FilterMode::Linear,
-                        MipmapFilterMode::Nearest,
-                    );
                     smaa_stage.blend_weight_offscreen_pass =
                         ctx.new_render_pass(blend_weight_img, None);
                     smaa_stage.neighborhood_blending_bindings.images[1] = blend_weight_img;
-
-                    let neighborhood_blending_img = ctx.new_render_texture(TextureParams {
-                        width: offscreen_width,
-                        height: offscreen_height,
-                        format: TextureFormat::RGBA8,
-                        ..Default::default()
-                    });
-                    ctx.texture_set_filter(
-                        neighborhood_blending_img,
-                        FilterMode::Linear,
-                        MipmapFilterMode::Nearest,
-                    );
                 };
             }
 
