@@ -5,7 +5,9 @@ You will raise a birds in this game. Probably will add something like motivation
 I try to use lottie animations in there. I wanted to use lottie-rs but there are too much dependencies. I hope I can make my own renderer not complex and able to render stuff that I animate in Synfig/Glaxnimate
 
 # TODO:
-- fix metal rendering by providing index_buffer
+- make pull request for depth/stencil texture format
+- add new pass method with stencil texture
+- make this work for metal also
 - nanoserde: use default instead of None when skip fields
 
 # Resources:

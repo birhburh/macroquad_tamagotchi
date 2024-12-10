@@ -159,7 +159,7 @@ checksum = "09d6582e104315a817dff97f75133544b2e094ee22447d2acf4a74e189ba06fc"
 [[package]]
 name = "macroquad"
 version = "0.4.13"
-source = "git+https://github.com/not-fl3/macroquad?rev=b4d043686e186a98ba098b1adcabf68f10665827#b4d043686e186a98ba098b1adcabf68f10665827"
+source = "git+https://github.com/birhburh/macroquad?branch=stencil_attachment#4985bfb6ae44d3a34def3cae6acca40b67df787a"
 dependencies = [
  "fontdue",
  "glam",
@@ -172,7 +172,7 @@ dependencies = [
 [[package]]
 name = "macroquad_macro"
 version = "0.1.8"
-source = "git+https://github.com/not-fl3/macroquad?rev=b4d043686e186a98ba098b1adcabf68f10665827#b4d043686e186a98ba098b1adcabf68f10665827"
+source = "git+https://github.com/birhburh/macroquad?branch=stencil_attachment#4985bfb6ae44d3a34def3cae6acca40b67df787a"
 
 [[package]]
 name = "macroquad_tamagotchi"
@@ -206,7 +206,7 @@ checksum = "78ca9ab1a0babb1e7d5695e3530886289c18cf2f87ec19a575a0abdce112e3a3"
 [[package]]
 name = "miniquad"
 version = "0.4.7"
-source = "git+https://github.com/not-fl3/miniquad?rev=c280723a524286155d46808eae193d9805509d00#c280723a524286155d46808eae193d9805509d00"
+source = "git+https://github.com/birhburh/miniquad?branch=stencil_attachment#94899abcd2e5d27ddaeb1ab69cae8df691eeeb54"
 dependencies = [
  "libc",
  "ndk-sys",

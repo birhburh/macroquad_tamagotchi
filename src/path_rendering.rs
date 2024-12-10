@@ -196,11 +196,6 @@ pub mod raw_miniquad {
                         },
                     }),
                     color_write: (false, false, false, false),
-                    color_blend: Some(BlendState::new(
-                        Equation::Add,
-                        BlendFactor::Value(BlendValue::SourceAlpha),
-                        BlendFactor::OneMinusValue(BlendValue::SourceAlpha),
-                    )),
                     ..Default::default()
                 },
             );
@@ -274,11 +269,6 @@ pub mod raw_miniquad {
                         },
                     }),
                     color_write: (false, false, false, false),
-                    color_blend: Some(BlendState::new(
-                        Equation::Add,
-                        BlendFactor::Value(BlendValue::SourceAlpha),
-                        BlendFactor::OneMinusValue(BlendValue::SourceAlpha),
-                    )),
                     ..Default::default()
                 },
             );
