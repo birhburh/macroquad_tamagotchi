@@ -149,7 +149,7 @@ async fn main() {
                     Some(smaa_stage.render_offscreen_pass),
                     miniquad::PassAction::Clear {
                         stencil: Some(0),
-                        color: Some((0., 0., 0., 0.)),
+                        color: Some((LIGHTGRAY.r, LIGHTGRAY.g, LIGHTGRAY.b, LIGHTGRAY.a)),
                         depth: Default::default(),
                     },
                 );
@@ -256,7 +256,7 @@ async fn main() {
                             transform_row_1: projection_matrix[1].into(),
                             transform_row_2: projection_matrix[2].into(),
                             transform_row_3: projection_matrix[3].into(),
-                            in_color: [0.1, 0.5, 0.2, 1.0],
+                            in_color: [0.521, 0.15, 0.2, 1.0],
                         },
                     ));
 
@@ -273,6 +273,39 @@ async fn main() {
 
                 gl.quad_context.end_render_pass();
             }
+
+            // {
+            //     // gl.quad_context
+            //     //     .begin_default_pass(miniquad::PassAction::Clear {
+            //     //         stencil: Some(0),
+            //     //         color: Default::default(),
+            //     //         depth: Default::default(),
+            //     //     });
+
+            //     gl.quad_context.begin_pass(
+            //         Some(smaa_stage.render_offscreen_pass),
+            //         miniquad::PassAction::Clear {
+            //             stencil: Some(0),
+            //             color: Some((LIGHTGRAY.r, LIGHTGRAY.g, LIGHTGRAY.b, LIGHTGRAY.a)),
+            //             depth: Default::default(),
+            //         },
+            //     );
+
+            //     gl.quad_context
+            //         .apply_pipeline(&smaa_stage.render_pipeline);
+            //     gl.quad_context
+            //         .apply_bindings(&smaa_stage.render_bindings);
+
+            //     gl.quad_context
+            //         .apply_uniforms(miniquad::UniformsSource::table(
+            //             &smaa::raw_miniquad::shader::Uniforms { u_rt },
+            //         ));
+
+            //     gl.quad_context.draw(0, 3, 1);
+
+            //     gl.quad_context.end_render_pass();
+            // }
+
 
             {
                 // gl.quad_context

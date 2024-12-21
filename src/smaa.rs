@@ -394,8 +394,8 @@ pub mod raw_miniquad {
             #[rustfmt::skip]
             let vertices: [Vertex; 3] = [
                 Vertex { pos : [ -0.5, -0.5 ], color: [1., 0., 0., 1.] },
-                Vertex { pos : [  0.5, -0.5 ], color: [0., 1., 0., 1.] },
-                Vertex { pos : [  0.0,  0.5 ], color: [0., 0., 1., 1.] },
+                Vertex { pos : [  0.5, -0.5 ], color: [1., 0., 0., 1.] },
+                Vertex { pos : [  0.0,  0.5 ], color: [1., 0., 0., 1.] },
             ];
             let vertex_buffer = ctx.new_buffer(
                 BufferType::VertexBuffer,
@@ -599,19 +599,7 @@ pub mod raw_miniquad {
                 &[BufferLayout::default()],
                 &[VertexAttribute::new("in_pos", VertexFormat::Float2)],
                 shader,
-                PipelineParams {
-                    color_blend: Some(BlendState::new(
-                        Equation::Add,
-                        BlendFactor::Value(BlendValue::SourceAlpha),
-                        BlendFactor::OneMinusValue(BlendValue::SourceAlpha),
-                    )),
-                    alpha_blend: Some(BlendState::new(
-                        Equation::Add,
-                        BlendFactor::One,
-                        BlendFactor::Zero,
-                    )),
-                    ..Default::default()
-                },
+                PipelineParams::default(),
             );
 
             Stage {
