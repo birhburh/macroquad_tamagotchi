@@ -79,9 +79,9 @@ impl TileBuilder for Builder {
         for row in 0..TILE_SIZE {
             for col in 0..TILE_SIZE {
                 self.atlas[self.next_row as usize * TILE_SIZE * ATLAS_SIZE * BYTES_PER_PIXEL
-                    + row * ATLAS_SIZE
+                    + row * ATLAS_SIZE * BYTES_PER_PIXEL
                     + self.next_col as usize * TILE_SIZE * BYTES_PER_PIXEL
-                    + col] = data[row * TILE_SIZE + col];
+                    + col * BYTES_PER_PIXEL] = data[row * TILE_SIZE + col];
             }
         }
 

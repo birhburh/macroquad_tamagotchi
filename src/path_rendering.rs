@@ -29,12 +29,12 @@ impl Stage {
         builder.color = [152, 0, 152, 255];
         rasterizer.fill(
             &[
-                PathCmd::Move(Vec2::new(400.0, 300.0)),
-                PathCmd::Quadratic(Vec2::new(500.0, 200.0), Vec2::new(400.0, 100.0)),
+                PathCmd::Move(Vec2::new(200.0, 300.0)),
+                PathCmd::Quadratic(Vec2::new(300.0, 200.0), Vec2::new(200.0, 100.0)),
                 PathCmd::Cubic(
-                    Vec2::new(350.0, 150.0),
-                    Vec2::new(100.0, 250.0),
-                    Vec2::new(400.0, 300.0),
+                    Vec2::new(150.0, 150.0),
+                    Vec2::new(-100.0, 250.0),
+                    Vec2::new(200.0, 300.0),
                 ),
                 PathCmd::Close,
             ],
@@ -44,13 +44,13 @@ impl Stage {
 
         let vertex_buffer = ctx.new_buffer(
             BufferType::VertexBuffer,
-            BufferUsage::Stream,
+            BufferUsage::Immutable,
             BufferSource::slice(&builder.vertices),
         );
 
         let index_buffer = ctx.new_buffer(
             BufferType::IndexBuffer,
-            BufferUsage::Stream,
+            BufferUsage::Immutable,
             BufferSource::slice(&builder.indices),
         );
 
@@ -132,7 +132,7 @@ pub mod shader {
                 vec2 scaled = 2.0 * pos / vec2(res);
                 gl_Position = vec4(scaled.x - 1.0, 1.0 - scaled.y, 0.0, 1.0);
                 v_uv = uv / vec2(atlas_size);
-                v_col = col;
+                v_col = col / 255.0;
             }
         "#;
 
@@ -151,46 +151,49 @@ pub mod shader {
         "#;
 
     pub const METAL: &str = r#"
-    #include <metal_stdlib>
+        #include <metal_stdlib>
 
-    using namespace metal;
+        using namespace metal;
 
-    struct Uniforms
-    {
-        float4 transform_row_0;
-        float4 transform_row_1;
-        float4 transform_row_2;
-        float4 transform_row_3;
-    };
+        struct Uniforms
+        {
+            float2 res;
+            float2 atlas_size;
+        };
 
-    struct Vertex
-    {
-        float2 position      [[attribute(0)]];
-    };
+        struct Vertex
+        {
+            float2 pos  [[attribute(0)]];
+            float2 uv   [[attribute(1)]];
+            float4 col  [[attribute(2)]];
+        };
 
-    struct RasterizerData
-    {
-        float4 position [[position]];
-    };
+        struct RasterizerData
+        {
+            float4 position [[position]];
+            float2 uv [[user(loc0)]];
+            float4 col [[user(loc1)]];
+        };
 
-    vertex RasterizerData vertexShader(Vertex v [[stage_in]], constant Uniforms& uniforms [[buffer(0)]])
-    {
-        RasterizerData out;
+        vertex RasterizerData vertexShader(Vertex v [[stage_in]], constant Uniforms& uniforms [[buffer(0)]])
+        {
+            RasterizerData out;
 
-        float4x4 instance = float4x4(uniforms.transform_row_0,
-                                     uniforms.transform_row_1,
-                                     uniforms.transform_row_2,
-                                     uniforms.transform_row_3);
-        out.position = instance * float4(v.position, 0.0, 1.0);
+            float2 scaled = 2.0 * v.pos / float2(uniforms.res);
+            out.position = float4(scaled.x - 1.0, 1.0 - scaled.y, 0.0, 1.0);
+            out.uv = v.uv / float2(uniforms.atlas_size);
+            out.col = v.col;
 
-        return out;
-    }
+            return out;
+        }
 
-    fragment float4 fragmentShader(RasterizerData in [[stage_in]])
-    {
-        return float4(0.1, 0.5, 0.2, 1.0);
-    }
-"#;
+        fragment float4 fragmentShader(RasterizerData in [[stage_in]],
+                                       texture2d<float> tex [[texture(0)]],
+                                       sampler smplr [[sampler(0)]])
+        {
+            return in.col * float4(1.0, 1.0, 1.0, tex.sample(smplr, in.uv).r);
+        }
+    "#;
 
     pub fn meta() -> ShaderMeta {
         ShaderMeta {

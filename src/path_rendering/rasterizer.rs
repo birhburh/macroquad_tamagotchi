@@ -1,6 +1,9 @@
 // Copied from https://github.com/micahrj/ochre
 
-use super::{geom::{Transform, Vec2}, path::{flatten, stroke, PathCmd}};
+use super::{
+    geom::{Transform, Vec2},
+    path::{flatten, stroke, PathCmd},
+};
 
 /// The tile size used by the rasterizer (not configurable).
 pub const TILE_SIZE: usize = 8;
