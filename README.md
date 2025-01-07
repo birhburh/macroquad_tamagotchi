@@ -14,11 +14,11 @@ I try to use lottie animations in there. I wanted to use lottie-rs but there are
 ## Lottie:
 - [lottie-rs](https://github.com/zimond/lottie-rs) - Ported module structure to nanoserde
 ## Path rendering:
-- [contrast_renderer](https://github.com/Lichtso/contrast_renderer) - Stole most of it for path_rendering module
+- [ochre](https://github.com/micahrj/ochre) - currently stealing rendering with anti-aliasing from it (uses RAVG algorithm)
+- [contrast_renderer](https://github.com/Lichtso/contrast_renderer) - Previous code that I tried to steal (probably will use ttf iterator with ttf-parser from it in the future)
 - [How to draw a complex shape using a stencil buffer](http://web.archive.org/web/20240118160026/https://www.glprogramming.com/red/chapter14.html#name13)
 - https://github.com/nical/lyon/wiki/Related-projects
 ## Path anti-aliasing:
-- [ochre](https://github.com/micahrj/ochre) - currently stealing anti-aliasing from it
 - https://github.com/evanw/theta - couldn't make it to look good
 - https://github.com/behdad/glyphy - didn't like the result but interesting resource
 - https://github.com/fintelia/smaa-rs - see branch trying_smaa for port of SMAA to metal and opengl es
