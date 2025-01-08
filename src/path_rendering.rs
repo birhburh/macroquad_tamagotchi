@@ -6,7 +6,7 @@ mod rasterizer;
 mod tile_builder_impl;
 
 use {
-    geom::{Transform, Vec2},
+    geom::{Mat2x2, Transform, Vec2},
     macroquad::miniquad::*,
     path::PathCmd,
     rasterizer::Rasterizer,
@@ -23,24 +23,92 @@ pub struct Stage {
 
 impl Stage {
     pub fn new(ctx: &mut dyn RenderingBackend) -> Stage {
+        let tree = usvg::Tree::from_file("res/Ghostscript_Tiger.svg", &usvg::Options::default()).unwrap();
         let mut builder = Builder::new();
 
-        let mut rasterizer = Rasterizer::new();
-        builder.color = [152, 0, 152, 255];
-        rasterizer.fill(
-            &[
-                PathCmd::Move(Vec2::new(200.0, 300.0)),
-                PathCmd::Quadratic(Vec2::new(300.0, 200.0), Vec2::new(200.0, 100.0)),
-                PathCmd::Cubic(
-                    Vec2::new(150.0, 150.0),
-                    Vec2::new(-100.0, 250.0),
-                    Vec2::new(200.0, 300.0),
-                ),
-                PathCmd::Close,
-            ],
-            Transform::id(),
-        );
-        rasterizer.finish(&mut builder);
+        // let mut rasterizer = Rasterizer::new();
+        // builder.color = [152, 0, 152, 255];
+        // rasterizer.fill(
+        //     &[
+        //         PathCmd::Move(Vec2::new(200.0, 300.0)),
+        //         PathCmd::Quadratic(Vec2::new(300.0, 200.0), Vec2::new(200.0, 100.0)),
+        //         PathCmd::Cubic(
+        //             Vec2::new(150.0, 150.0),
+        //             Vec2::new(-100.0, 250.0),
+        //             Vec2::new(200.0, 300.0),
+        //         ),
+        //         PathCmd::Close,
+        //     ],
+        //     Transform::id(),
+        // );
+        // rasterizer.finish(&mut builder);
+
+        fn render(node: &usvg::Node, builder: &mut Builder) {
+            use usvg::NodeExt;
+            match *node.borrow() {
+                usvg::NodeKind::Path(ref p) => {
+                    let t = node.transform();
+                    let transform = Transform::new(
+                        Mat2x2::new(t.a as f32, t.c as f32, t.b as f32, t.d as f32),
+                        Vec2::new(t.e as f32, t.f as f32),
+                    );
+
+                    let mut path = Vec::new();
+                    for segment in p.data.0.iter() {
+                        match *segment {
+                            usvg::PathSegment::MoveTo { x, y } => {
+                                path.push(PathCmd::Move(Vec2::new(x as f32, y as f32)));
+                            }
+                            usvg::PathSegment::LineTo { x, y } => {
+                                path.push(PathCmd::Line(Vec2::new(x as f32, y as f32)));
+                            }
+                            usvg::PathSegment::CurveTo {
+                                x1,
+                                y1,
+                                x2,
+                                y2,
+                                x,
+                                y,
+                            } => {
+                                path.push(PathCmd::Cubic(
+                                    Vec2::new(x1 as f32, y1 as f32),
+                                    Vec2::new(x2 as f32, y2 as f32),
+                                    Vec2::new(x as f32, y as f32),
+                                ));
+                            }
+                            usvg::PathSegment::ClosePath => {
+                                path.push(PathCmd::Close);
+                            }
+                        }
+                    }
+
+                    if let Some(ref f) = p.fill {
+                        if let usvg::Paint::Color(color) = f.paint {
+                            builder.color = [color.red, color.green, color.blue, f.opacity.to_u8()];
+                            let mut rasterizer = Rasterizer::new();
+                            rasterizer.fill(&path, transform);
+                            rasterizer.finish(builder);
+                        }
+                    }
+
+                    if let Some(ref s) = p.stroke {
+                        if let usvg::Paint::Color(color) = s.paint {
+                            builder.color = [color.red, color.green, color.blue, s.opacity.to_u8()];
+                            let mut rasterizer = Rasterizer::new();
+                            rasterizer.stroke(&path, s.width.value() as f32, transform);
+                            rasterizer.finish(builder);
+                        }
+                    }
+                }
+                _ => {}
+            }
+
+            for child in node.children() {
+                render(&child, builder);
+            }
+        }
+
+        render(&tree.root(), &mut builder);
 
         let vertex_buffer = ctx.new_buffer(
             BufferType::VertexBuffer,
