@@ -11,6 +11,7 @@ use {
     path::PathCmd,
     rasterizer::Rasterizer,
     tile_builder_impl::Builder,
+    tiny_skia_path::{PathSegment, Point},
 };
 
 pub use tile_builder_impl::ATLAS_SIZE;
@@ -23,7 +24,8 @@ pub struct Stage {
 
 impl Stage {
     pub fn new(ctx: &mut dyn RenderingBackend) -> Stage {
-        let tree = usvg::Tree::from_file("res/Ghostscript_Tiger.svg", &usvg::Options::default()).unwrap();
+        let svg_data = std::fs::read("res/Ghostscript_Tiger.svg").unwrap();
+        let tree = usvg::Tree::from_data(&svg_data, &usvg::Options::default()).unwrap();
         let mut builder = Builder::new();
 
         // let mut rasterizer = Rasterizer::new();
@@ -43,72 +45,84 @@ impl Stage {
         // );
         // rasterizer.finish(&mut builder);
 
-        fn render(node: &usvg::Node, builder: &mut Builder) {
-            use usvg::NodeExt;
-            match *node.borrow() {
-                usvg::NodeKind::Path(ref p) => {
-                    let t = node.transform();
+        fn render_node(node: &usvg::Node, builder: &mut Builder) {
+            match node {
+                usvg::Node::Path(ref p) => {
+                    let t = node.abs_transform();
                     let transform = Transform::new(
-                        Mat2x2::new(t.a as f32, t.c as f32, t.b as f32, t.d as f32),
-                        Vec2::new(t.e as f32, t.f as f32),
+                        Mat2x2::new(t.sx as f32, t.ky as f32, t.kx as f32, t.sy as f32),
+                        Vec2::new(t.tx as f32, t.ty as f32),
                     );
 
                     let mut path = Vec::new();
-                    for segment in p.data.0.iter() {
-                        match *segment {
-                            usvg::PathSegment::MoveTo { x, y } => {
+                    for segment in p.data().segments() {
+                        match segment {
+                            PathSegment::MoveTo(Point { x, y }) => {
                                 path.push(PathCmd::Move(Vec2::new(x as f32, y as f32)));
                             }
-                            usvg::PathSegment::LineTo { x, y } => {
+                            PathSegment::LineTo(Point { x, y }) => {
                                 path.push(PathCmd::Line(Vec2::new(x as f32, y as f32)));
                             }
-                            usvg::PathSegment::CurveTo {
-                                x1,
-                                y1,
-                                x2,
-                                y2,
-                                x,
-                                y,
-                            } => {
+                            PathSegment::CubicTo(
+                                Point { x: x1, y: y1 },
+                                Point { x: x2, y: y2 },
+                                Point { x, y },
+                            ) => {
                                 path.push(PathCmd::Cubic(
                                     Vec2::new(x1 as f32, y1 as f32),
                                     Vec2::new(x2 as f32, y2 as f32),
                                     Vec2::new(x as f32, y as f32),
                                 ));
                             }
-                            usvg::PathSegment::ClosePath => {
+                            PathSegment::QuadTo(
+                                Point { x: x1, y: y1 },
+                                Point { x: x2, y: y2 },
+                            ) => {
+                                path.push(PathCmd::Quadratic(
+                                    Vec2::new(x1 as f32, y1 as f32),
+                                    Vec2::new(x2 as f32, y2 as f32),
+                                ));
+                            }
+                            PathSegment::Close => {
                                 path.push(PathCmd::Close);
                             }
                         }
                     }
 
-                    if let Some(ref f) = p.fill {
-                        if let usvg::Paint::Color(color) = f.paint {
-                            builder.color = [color.red, color.green, color.blue, f.opacity.to_u8()];
+                    if let Some(ref f) = p.fill() {
+                        if let usvg::Paint::Color(color) = f.paint() {
+                            builder.color =
+                                [color.red, color.green, color.blue, f.opacity().to_u8()];
                             let mut rasterizer = Rasterizer::new();
                             rasterizer.fill(&path, transform);
                             rasterizer.finish(builder);
                         }
                     }
 
-                    if let Some(ref s) = p.stroke {
-                        if let usvg::Paint::Color(color) = s.paint {
-                            builder.color = [color.red, color.green, color.blue, s.opacity.to_u8()];
+                    if let Some(ref s) = p.stroke() {
+                        if let usvg::Paint::Color(color) = s.paint() {
+                            builder.color =
+                                [color.red, color.green, color.blue, s.opacity().to_u8()];
                             let mut rasterizer = Rasterizer::new();
-                            rasterizer.stroke(&path, s.width.value() as f32, transform);
+                            rasterizer.stroke(&path, s.width().get() as f32, transform);
                             rasterizer.finish(builder);
                         }
                     }
                 }
+                usvg::Node::Group(ref g) => {
+                    render_nodes(g, builder);
+                }
                 _ => {}
-            }
-
-            for child in node.children() {
-                render(&child, builder);
             }
         }
 
-        render(&tree.root(), &mut builder);
+        fn render_nodes(group: &usvg::Group, builder: &mut Builder) {
+            for child in group.children() {
+                render_node(&child, builder);
+            }
+        }
+
+        render_nodes(&tree.root(), &mut builder);
 
         let vertex_buffer = ctx.new_buffer(
             BufferType::VertexBuffer,
