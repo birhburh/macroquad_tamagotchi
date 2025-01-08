@@ -28,23 +28,6 @@ impl Stage {
         let tree = usvg::Tree::from_data(svg_data, &usvg::Options::default()).unwrap();
         let mut builder = Builder::new();
 
-        // let mut rasterizer = Rasterizer::new();
-        // builder.color = [152, 0, 152, 255];
-        // rasterizer.fill(
-        //     &[
-        //         PathCmd::Move(Vec2::new(200.0, 300.0)),
-        //         PathCmd::Quadratic(Vec2::new(300.0, 200.0), Vec2::new(200.0, 100.0)),
-        //         PathCmd::Cubic(
-        //             Vec2::new(150.0, 150.0),
-        //             Vec2::new(-100.0, 250.0),
-        //             Vec2::new(200.0, 300.0),
-        //         ),
-        //         PathCmd::Close,
-        //     ],
-        //     Transform::id(),
-        // );
-        // rasterizer.finish(&mut builder);
-
         fn render_node(node: &usvg::Node, builder: &mut Builder) {
             match node {
                 usvg::Node::Path(ref p) => {
@@ -122,7 +105,24 @@ impl Stage {
             }
         }
 
-        render_nodes(&tree.root(), &mut builder);
+        // render_nodes(&tree.root(), &mut builder);
+
+        let mut rasterizer = Rasterizer::new();
+        builder.color = [152, 0, 152, 255];
+        rasterizer.fill(
+            &[
+                PathCmd::Move(Vec2::new(200.0, 300.0)),
+                PathCmd::Quadratic(Vec2::new(300.0, 200.0), Vec2::new(200.0, 100.0)),
+                PathCmd::Cubic(
+                    Vec2::new(150.0, 150.0),
+                    Vec2::new(-100.0, 250.0),
+                    Vec2::new(200.0, 300.0),
+                ),
+                PathCmd::Close,
+            ],
+            Transform::id(),
+        );
+        rasterizer.finish(&mut builder);
 
         let vertex_buffer = ctx.new_buffer(
             BufferType::VertexBuffer,
@@ -245,9 +245,9 @@ pub mod shader {
 
         struct Vertex
         {
-            float2 pos  [[attribute(0)]];
-            float2 uv   [[attribute(1)]];
-            float4 col  [[attribute(2)]];
+            short2 pos  [[attribute(0)]];
+            short2 uv   [[attribute(1)]];
+            uchar4 col  [[attribute(2)]];
         };
 
         struct RasterizerData
@@ -261,10 +261,10 @@ pub mod shader {
         {
             RasterizerData out;
 
-            float2 scaled = 2.0 * v.pos / float2(uniforms.res);
+            float2 scaled = 2.0 * float2(v.pos) / float2(uniforms.res);
             out.position = float4(scaled.x - 1.0, 1.0 - scaled.y, 0.0, 1.0);
-            out.uv = v.uv / float2(uniforms.atlas_size);
-            out.col = v.col;
+            out.uv = float2(v.uv) / float2(uniforms.atlas_size);
+            out.col = float4(v.col) / 255.0;
 
             return out;
         }

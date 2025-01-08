@@ -17,7 +17,7 @@ fn window_conf() -> Conf {
         )
         .to_owned(),
         platform: miniquad::conf::Platform {
-            apple_gfx_api: miniquad::conf::AppleGfxApi::OpenGl,
+            apple_gfx_api: miniquad::conf::AppleGfxApi::Metal,
             blocking_event_loop: true,
             ..Default::default()
         },

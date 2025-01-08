@@ -255,7 +255,7 @@ checksum = "a7a70ba024b9dc04c27ea2f0c0548feb474ec5c54bba33a7f72f873a39d07b24"
 [[package]]
 name = "macroquad"
 version = "0.4.13"
-source = "git+https://github.com/not-fl3/macroquad?rev=b4d043686e186a98ba098b1adcabf68f10665827#b4d043686e186a98ba098b1adcabf68f10665827"
+source = "git+https://github.com/not-fl3/macroquad?rev=2f7f3c8433bbec3bc8829b231db0e19a6f2b5432#2f7f3c8433bbec3bc8829b231db0e19a6f2b5432"
 dependencies = [
  "fontdue",
  "glam",
@@ -268,7 +268,7 @@ dependencies = [
 [[package]]
 name = "macroquad_macro"
 version = "0.1.8"
-source = "git+https://github.com/not-fl3/macroquad?rev=b4d043686e186a98ba098b1adcabf68f10665827#b4d043686e186a98ba098b1adcabf68f10665827"
+source = "git+https://github.com/not-fl3/macroquad?rev=2f7f3c8433bbec3bc8829b231db0e19a6f2b5432#2f7f3c8433bbec3bc8829b231db0e19a6f2b5432"
 
 [[package]]
 name = "macroquad_tamagotchi"
