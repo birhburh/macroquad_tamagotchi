@@ -11,8 +11,8 @@ build_targets = ["armv7-linux-androideabi"]
 
 [dependencies]
 # macroquad = { path = "../macroquad" }
-macroquad = "0.4"
-# macroquad = { git = "https://github.com/not-fl3/macroquad", rev = "b4d043686e186a98ba098b1adcabf68f10665827"}
+# macroquad = "0.4"
+macroquad = { git = "https://github.com/not-fl3/macroquad", rev = "b4d043686e186a98ba098b1adcabf68f10665827"}
 # miniquad = { git = "https://github.com/birhburh/miniquad", branch = "triangle_strip"}
 # miniquad = { path = "../miniquad", features = ["log-impl"] }
 

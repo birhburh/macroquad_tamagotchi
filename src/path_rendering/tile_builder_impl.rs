@@ -11,7 +11,7 @@ pub struct Vertex {
 
 pub struct Builder {
     pub vertices: Vec<Vertex>,
-    pub indices: Vec<u32>,
+    pub indices: Vec<u16>,
     pub atlas: Vec<u8>,
     pub color: [u8; 4],
     next_row: u16,
@@ -46,7 +46,7 @@ impl Builder {
 
 impl TileBuilder for Builder {
     fn tile(&mut self, x: i16, y: i16, data: [u8; TILE_SIZE * TILE_SIZE]) {
-        let base = self.vertices.len() as u32;
+        let base = self.vertices.len() as u16;
 
         let u1 = (self.next_col * TILE_SIZE as u16) as i16;
         let u2 = ((self.next_col + 1) * TILE_SIZE as u16) as i16;
@@ -93,7 +93,7 @@ impl TileBuilder for Builder {
     }
 
     fn span(&mut self, x: i16, y: i16, width: u16) {
-        let base = self.vertices.len() as u32;
+        let base = self.vertices.len() as u16;
 
         self.vertices.push(Vertex {
             pos: [x, y],

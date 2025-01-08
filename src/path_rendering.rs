@@ -24,8 +24,8 @@ pub struct Stage {
 
 impl Stage {
     pub fn new(ctx: &mut dyn RenderingBackend) -> Stage {
-        let svg_data = std::fs::read("res/Ghostscript_Tiger.svg").unwrap();
-        let tree = usvg::Tree::from_data(&svg_data, &usvg::Options::default()).unwrap();
+        let svg_data = include_bytes!("../res/Ghostscript_Tiger.svg");
+        let tree = usvg::Tree::from_data(svg_data, &usvg::Options::default()).unwrap();
         let mut builder = Builder::new();
 
         // let mut rasterizer = Rasterizer::new();
