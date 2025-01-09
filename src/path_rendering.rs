@@ -107,17 +107,34 @@ impl Stage {
 
         // render_nodes(&tree.root(), &mut builder);
 
+        // let mut rasterizer = Rasterizer::new();
+        // builder.color = [152, 0, 152, 255];
+        // rasterizer.fill(
+        //     &[
+        //         PathCmd::Move(Vec2::new(200.0, 300.0)),
+        //         PathCmd::Quadratic(Vec2::new(300.0, 200.0), Vec2::new(200.0, 100.0)),
+        //         PathCmd::Cubic(
+        //             Vec2::new(150.0, 150.0),
+        //             Vec2::new(-100.0, 250.0),
+        //             Vec2::new(200.0, 300.0),
+        //         ),
+        //         PathCmd::Close,
+        //     ],
+        //     Transform::id(),
+        // );
+        // rasterizer.finish(&mut builder);
+
         let mut rasterizer = Rasterizer::new();
-        builder.color = [152, 0, 152, 255];
+
+        // Let's say it's circle
+        builder.color = [15, 201, 52, 255];
         rasterizer.fill(
             &[
-                PathCmd::Move(Vec2::new(200.0, 300.0)),
-                PathCmd::Quadratic(Vec2::new(300.0, 200.0), Vec2::new(200.0, 100.0)),
-                PathCmd::Cubic(
-                    Vec2::new(150.0, 150.0),
-                    Vec2::new(-100.0, 250.0),
-                    Vec2::new(200.0, 300.0),
-                ),
+                PathCmd::Move(Vec2::new(200.0, 200.0)),
+                PathCmd::Quadratic(Vec2::new(250.0, 200.0), Vec2::new(250.0, 250.0)),
+                PathCmd::Quadratic(Vec2::new(250.0, 300.0), Vec2::new(200.0, 300.0)),
+                PathCmd::Quadratic(Vec2::new(150.0, 300.0), Vec2::new(150.0, 250.0)),
+                PathCmd::Quadratic(Vec2::new(150.0, 200.0), Vec2::new(200.0, 200.0)),
                 PathCmd::Close,
             ],
             Transform::id(),

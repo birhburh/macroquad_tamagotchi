@@ -10,14 +10,14 @@ use {
 
 fn window_conf() -> Conf {
     let sample_count = 1;
-    let high_dpi = true;
+    let high_dpi = false;
     Conf {
         window_title: format!(
             "Lottie Example (sample_count = {sample_count}, high_dpi = {high_dpi})"
         )
         .to_owned(),
         platform: miniquad::conf::Platform {
-            apple_gfx_api: miniquad::conf::AppleGfxApi::Metal,
+            apple_gfx_api: miniquad::conf::AppleGfxApi::OpenGl,
             blocking_event_loop: true,
             ..Default::default()
         },
