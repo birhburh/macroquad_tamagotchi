@@ -131,64 +131,59 @@ async fn main() {
         if screen_width() != saved_width || screen_height() != saved_height {
             let gl = unsafe { get_internal_gl() };
 
+            let tiger = true;
+
             saved_width = screen_width();
             saved_height = screen_height();
 
-            // let mut rasterizer = Rasterizer::new();
             stage.builder = Builder::new();
-            // stage.builder.color = [15, 201, 52, 255];
-
-            // let side_size = 50.0;
-            // let scale = if screen_width() < screen_height() {
-            //     screen_width() / side_size
-            // } else {
-            //     screen_height() / side_size
-            // };
-
-            // // Let's say it's circle
-            // rasterizer.fill(
-            //     &[
-            //         PathCmd::Move(path_rendering::Vec2::new(0.0, 0.0)),
-            //         PathCmd::Quadratic(
-            //             path_rendering::Vec2::new(side_size / 2.0, 0.0),
-            //             path_rendering::Vec2::new(side_size / 2.0, side_size / 2.0),
-            //         ),
-            //         PathCmd::Quadratic(
-            //             path_rendering::Vec2::new(side_size / 2.0, side_size),
-            //             path_rendering::Vec2::new(0.0, side_size),
-            //         ),
-            //         PathCmd::Quadratic(
-            //             path_rendering::Vec2::new(-side_size / 2.0, side_size),
-            //             path_rendering::Vec2::new(-side_size / 2.0, side_size / 2.0),
-            //         ),
-            //         PathCmd::Quadratic(
-            //             path_rendering::Vec2::new(-side_size / 2.0, 0.0),
-            //             path_rendering::Vec2::new(0.0, 0.0),
-            //         ),
-            //         PathCmd::Close,
-            //     ],
-            //     Transform::scale(scale).then(Transform::translate(
-            //         screen_width() / 2.0,
-            //         screen_height() / 2.0 - side_size * scale / 2.0,
-            //     )),
-            // );
-            // rasterizer.finish(&mut stage.builder);
-
-            let side_size = tree.size().width().min(tree.size().height());
-            let scale = if screen_width() < screen_height() {
-                screen_width() / side_size
+            let side_size = if tiger {
+                tree.size().width().min(tree.size().height())
             } else {
-                screen_height() / side_size
+                50.0
             };
-            dbg!(scale);
-            render_nodes(
-                &tree.root(),
-                &mut stage.builder,
-                Transform::scale(scale).then(Transform::translate(
-                    screen_width() / 2.0 - side_size * scale / 2.0,
-                    screen_height() / 2.0 - side_size * scale / 2.0,
-                )),
-            );
+            let scale = if screen_width() < screen_height() {
+                screen_width() / side_size * 0.9
+            } else {
+                screen_height() / side_size * 0.9
+            };
+            let transform = Transform::scale(scale).then(Transform::translate(
+                screen_width() / 2.0 - side_size * scale / 2.0,
+                screen_height() / 2.0 - side_size * scale / 2.0,
+            ));
+
+            if tiger {
+                render_nodes(&tree.root(), &mut stage.builder, transform);
+            } else {
+                let mut rasterizer = Rasterizer::new();
+                stage.builder.color = [15, 201, 52, 255];
+
+                // Let's say it's circle
+                rasterizer.fill(
+                    &[
+                        PathCmd::Move(path_rendering::Vec2::new(0.0, side_size / 2.0)),
+                        PathCmd::Quadratic(
+                            path_rendering::Vec2::new(0.0, 0.0),
+                            path_rendering::Vec2::new(side_size / 2.0, 0.0),
+                        ),
+                        PathCmd::Quadratic(
+                            path_rendering::Vec2::new(side_size, 0.0),
+                            path_rendering::Vec2::new(side_size, side_size / 2.0),
+                        ),
+                        PathCmd::Quadratic(
+                            path_rendering::Vec2::new(side_size, side_size),
+                            path_rendering::Vec2::new(side_size / 2.0, side_size),
+                        ),
+                        PathCmd::Quadratic(
+                            path_rendering::Vec2::new(0.0, side_size),
+                            path_rendering::Vec2::new(0.0, side_size / 2.0),
+                        ),
+                        PathCmd::Close,
+                    ],
+                    transform,
+                );
+                rasterizer.finish(&mut stage.builder);
+            }
 
             gl.quad_context.buffer_update(
                 stage.bindings.vertex_buffers[0],
