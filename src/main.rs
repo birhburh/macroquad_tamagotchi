@@ -10,7 +10,8 @@ use {
         },
         prelude::*,
     },
-    path_rendering::{shader, Builder, PathCmd, Rasterizer, Stage, Transform, ATLAS_SIZE},
+    path_rendering::{shader, Builder, Mat2x2, PathCmd, Rasterizer, Stage, Transform, ATLAS_SIZE},
+    tiny_skia_path::{PathSegment, Point},
 };
 
 fn window_conf() -> Conf {
@@ -32,10 +33,85 @@ fn window_conf() -> Conf {
     }
 }
 
+fn render_node(node: &usvg::Node, builder: &mut Builder) {
+    match node {
+        usvg::Node::Path(ref p) => {
+            let t = node.abs_transform();
+            let transform = Transform::new(
+                Mat2x2::new(t.sx as f32, t.ky as f32, t.kx as f32, t.sy as f32),
+                path_rendering::Vec2::new(t.tx as f32, t.ty as f32),
+            );
+
+            let mut path = Vec::new();
+            for segment in p.data().segments() {
+                match segment {
+                    PathSegment::MoveTo(Point { x, y }) => {
+                        path.push(PathCmd::Move(path_rendering::Vec2::new(x as f32, y as f32)));
+                    }
+                    PathSegment::LineTo(Point { x, y }) => {
+                        path.push(PathCmd::Line(path_rendering::Vec2::new(x as f32, y as f32)));
+                    }
+                    PathSegment::CubicTo(
+                        Point { x: x1, y: y1 },
+                        Point { x: x2, y: y2 },
+                        Point { x, y },
+                    ) => {
+                        path.push(PathCmd::Cubic(
+                            path_rendering::Vec2::new(x1 as f32, y1 as f32),
+                            path_rendering::Vec2::new(x2 as f32, y2 as f32),
+                            path_rendering::Vec2::new(x as f32, y as f32),
+                        ));
+                    }
+                    PathSegment::QuadTo(Point { x: x1, y: y1 }, Point { x: x2, y: y2 }) => {
+                        path.push(PathCmd::Quadratic(
+                            path_rendering::Vec2::new(x1 as f32, y1 as f32),
+                            path_rendering::Vec2::new(x2 as f32, y2 as f32),
+                        ));
+                    }
+                    PathSegment::Close => {
+                        path.push(PathCmd::Close);
+                    }
+                }
+            }
+
+            if let Some(ref f) = p.fill() {
+                if let usvg::Paint::Color(color) = f.paint() {
+                    builder.color = [color.red, color.green, color.blue, f.opacity().to_u8()];
+                    let mut rasterizer = Rasterizer::new();
+                    rasterizer.fill(&path, transform);
+                    rasterizer.finish(builder);
+                }
+            }
+
+            if let Some(ref s) = p.stroke() {
+                if let usvg::Paint::Color(color) = s.paint() {
+                    builder.color = [color.red, color.green, color.blue, s.opacity().to_u8()];
+                    let mut rasterizer = Rasterizer::new();
+                    rasterizer.stroke(&path, s.width().get() as f32, transform);
+                    rasterizer.finish(builder);
+                }
+            }
+        }
+        usvg::Node::Group(ref g) => {
+            render_nodes(g, builder);
+        }
+        _ => {}
+    }
+}
+
+fn render_nodes(group: &usvg::Group, builder: &mut Builder) {
+    for child in group.children() {
+        render_node(&child, builder);
+    }
+}
+
 #[macroquad::main(window_conf)]
 async fn main() {
     // let model = nanolottie::load_lottie_file(false);
     // dbg!(&model);
+
+    let svg_data = include_bytes!("../res/Ghostscript_Tiger.svg");
+    let tree = usvg::Tree::from_data(svg_data, &usvg::Options::default()).unwrap();
 
     let mut stage = {
         let InternalGlContext {
@@ -66,7 +142,7 @@ async fn main() {
                 screen_width() / side_size
             } else {
                 screen_height() / side_size
-            } / 2.0;
+            };
             dbg!(scale);
             // Let's say it's circle
             rasterizer.fill(
@@ -91,8 +167,8 @@ async fn main() {
                     PathCmd::Close,
                 ],
                 Transform::scale(scale).then(Transform::translate(
-                    screen_width() / 2.0 + side_size / 2.0 * scale,
-                    side_size / 2.0 * scale,
+                    screen_width() / 2.0,
+                    screen_height() / 2.0 - side_size * scale / 2.0,
                 )),
             );
             rasterizer.finish(&mut stage.builder);
