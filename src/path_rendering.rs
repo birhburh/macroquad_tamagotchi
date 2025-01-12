@@ -27,8 +27,6 @@ impl Stage {
         let tree = usvg::Tree::from_data(svg_data, &usvg::Options::default()).unwrap();
         let mut builder = Builder::new();
 
-        // render_nodes(&tree.root(), &mut builder);
-
         // let mut rasterizer = Rasterizer::new();
         // builder.color = [152, 0, 152, 255];
         // rasterizer.fill(
@@ -49,13 +47,13 @@ impl Stage {
         let vertex_buffer = ctx.new_buffer(
             BufferType::VertexBuffer,
             BufferUsage::Dynamic,
-            BufferSource::empty::<Vertex>(10000),
+            BufferSource::empty::<Vertex>(70000), // enough for tiger
         );
 
         let index_buffer = ctx.new_buffer(
             BufferType::IndexBuffer,
             BufferUsage::Dynamic,
-            BufferSource::empty::<u16>(5000),
+            BufferSource::empty::<u16>(100000), // enough for tiger
         );
 
         let tex = ctx.new_texture_from_data_and_format(
@@ -150,11 +148,11 @@ pub mod shader {
             varying vec4 v_col;
 
             void main() {
-                // gl_FragColor = v_col * vec4(1.0, 1.0, 1.0, texture2D(tex, v_uv).r);
-                gl_FragColor = vec4(1.0 - texture2D(tex, v_uv).r,
-                                    1.0 - texture2D(tex, v_uv).r,
-                                    1.0 - texture2D(tex, v_uv).r,
-                                    1.0);
+                gl_FragColor = v_col * vec4(1.0, 1.0, 1.0, texture2D(tex, v_uv).r);
+                // gl_FragColor = vec4(1.0 - texture2D(tex, v_uv).r,
+                //                     1.0 - texture2D(tex, v_uv).r,
+                //                     1.0 - texture2D(tex, v_uv).r,
+                //                     1.0);
             }
         "#;
 
