@@ -29,7 +29,7 @@ impl Builder {
                 atlas[first_byte] = 255;
                 atlas[first_byte + 1] = 255;
                 atlas[first_byte + 2] = 255;
-                atlas[first_byte + 3] = 255;
+                atlas[first_byte + 3] = 0;
             }
         }
 
@@ -76,6 +76,14 @@ impl TileBuilder for Builder {
         self.indices
             .extend_from_slice(&[base, base + 1, base + 2, base, base + 2, base + 3]);
 
+        // println!("tile at ({}, {}):", x, y);
+        // for row in 0..TILE_SIZE {
+        //     print!("  ");
+        //     for col in 0..TILE_SIZE {
+        //         print!("{:3} ", data[row * TILE_SIZE + col]);
+        //     }
+        //     print!("\n");
+        // }
         for row in 0..TILE_SIZE {
             for col in 0..TILE_SIZE {
                 self.atlas[self.next_row as usize * TILE_SIZE * ATLAS_SIZE * BYTES_PER_PIXEL

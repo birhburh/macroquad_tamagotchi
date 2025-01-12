@@ -3,9 +3,14 @@ mod nanolottie;
 mod path_rendering;
 
 use {
-    macroquad::prelude::*,
-    miniquad::PassAction,
-    path_rendering::{shader, Stage, ATLAS_SIZE},
+    macroquad::{
+        miniquad::{
+            conf::{AppleGfxApi, Platform},
+            BufferSource, PassAction, TextureFormat, TextureParams, UniformsSource,
+        },
+        prelude::*,
+    },
+    path_rendering::{shader, Builder, PathCmd, Rasterizer, Stage, Transform, ATLAS_SIZE},
 };
 
 fn window_conf() -> Conf {
@@ -16,8 +21,8 @@ fn window_conf() -> Conf {
             "Lottie Example (sample_count = {sample_count}, high_dpi = {high_dpi})"
         )
         .to_owned(),
-        platform: miniquad::conf::Platform {
-            apple_gfx_api: miniquad::conf::AppleGfxApi::OpenGl,
+        platform: Platform {
+            apple_gfx_api: AppleGfxApi::OpenGl,
             blocking_event_loop: true,
             ..Default::default()
         },
@@ -32,7 +37,7 @@ async fn main() {
     // let model = nanolottie::load_lottie_file(false);
     // dbg!(&model);
 
-    let stage = {
+    let mut stage = {
         let InternalGlContext {
             quad_context: ctx, ..
         } = unsafe { get_internal_gl() };
@@ -40,8 +45,82 @@ async fn main() {
         Stage::new(ctx)
     };
 
+    let mut saved_width = 0.0;
+    let mut saved_height = 0.0;
+
     loop {
         clear_background(DARKGRAY);
+
+        if screen_width() != saved_width || screen_height() != saved_height {
+            let mut gl = unsafe { get_internal_gl() };
+
+            saved_width = screen_width();
+            saved_height = screen_height();
+
+            let mut rasterizer = Rasterizer::new();
+            stage.builder = Builder::new();
+            stage.builder.color = [15, 201, 52, 255];
+
+            let side_size = 50.0;
+            let scale = if screen_width() < screen_height() {
+                screen_width() / side_size
+            } else {
+                screen_height() / side_size
+            } / 2.0;
+            dbg!(scale);
+            // Let's say it's circle
+            rasterizer.fill(
+                &[
+                    PathCmd::Move(path_rendering::Vec2::new(0.0, 0.0)),
+                    PathCmd::Quadratic(
+                        path_rendering::Vec2::new(side_size / 2.0, 0.0),
+                        path_rendering::Vec2::new(side_size / 2.0, side_size / 2.0),
+                    ),
+                    PathCmd::Quadratic(
+                        path_rendering::Vec2::new(side_size / 2.0, side_size),
+                        path_rendering::Vec2::new(0.0, side_size),
+                    ),
+                    PathCmd::Quadratic(
+                        path_rendering::Vec2::new(-side_size / 2.0, side_size),
+                        path_rendering::Vec2::new(-side_size / 2.0, side_size / 2.0),
+                    ),
+                    PathCmd::Quadratic(
+                        path_rendering::Vec2::new(-side_size / 2.0, 0.0),
+                        path_rendering::Vec2::new(0.0, 0.0),
+                    ),
+                    PathCmd::Close,
+                ],
+                Transform::scale(scale).then(Transform::translate(
+                    screen_width() / 2.0 + side_size / 2.0 * scale,
+                    side_size / 2.0 * scale,
+                )),
+            );
+            rasterizer.finish(&mut stage.builder);
+            gl.quad_context.buffer_update(
+                stage.bindings.vertex_buffers[0],
+                BufferSource::slice(&stage.builder.vertices),
+            );
+            gl.quad_context.buffer_update(
+                stage.bindings.index_buffer,
+                BufferSource::slice(&stage.builder.indices),
+            );
+
+            gl.quad_context.delete_texture(stage.bindings.images[0]);
+
+            let tex = gl.quad_context.new_texture_from_data_and_format(
+                &stage.builder.atlas,
+                TextureParams {
+                    width: ATLAS_SIZE as u32,
+                    height: ATLAS_SIZE as u32,
+                    format: TextureFormat::RGBA8,
+                    min_filter: FilterMode::Nearest,
+                    mag_filter: FilterMode::Nearest,
+                    ..Default::default()
+                },
+            );
+
+            stage.bindings.images[0] = tex;
+        }
 
         // draw_lottie(&model);
 
@@ -58,7 +137,7 @@ async fn main() {
             gl.quad_context.apply_bindings(&stage.bindings);
 
             gl.quad_context
-                .apply_uniforms(miniquad::UniformsSource::table(&shader::Uniforms {
+                .apply_uniforms(UniformsSource::table(&shader::Uniforms {
                     res: [screen_width(), screen_height()],
                     atlas_size: [ATLAS_SIZE as f32, ATLAS_SIZE as f32],
                 }));

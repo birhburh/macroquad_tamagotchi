@@ -6,15 +6,19 @@ mod rasterizer;
 mod tile_builder_impl;
 
 use {
-    geom::{Mat2x2, Transform, Vec2},
+    geom::Mat2x2,
     macroquad::miniquad::*,
-    path::PathCmd,
-    rasterizer::Rasterizer,
-    tile_builder_impl::Builder,
+    tile_builder_impl::Vertex,
     tiny_skia_path::{PathSegment, Point},
 };
 
-pub use tile_builder_impl::ATLAS_SIZE;
+pub use {
+    geom::{Transform, Vec2},
+    path::PathCmd,
+    rasterizer::Rasterizer,
+    tile_builder_impl::Builder,
+    tile_builder_impl::ATLAS_SIZE,
+};
 
 pub struct Stage {
     pub pipeline: Pipeline,
@@ -57,10 +61,7 @@ impl Stage {
                                     Vec2::new(x as f32, y as f32),
                                 ));
                             }
-                            PathSegment::QuadTo(
-                                Point { x: x1, y: y1 },
-                                Point { x: x2, y: y2 },
-                            ) => {
+                            PathSegment::QuadTo(Point { x: x1, y: y1 }, Point { x: x2, y: y2 }) => {
                                 path.push(PathCmd::Quadratic(
                                     Vec2::new(x1 as f32, y1 as f32),
                                     Vec2::new(x2 as f32, y2 as f32),
@@ -124,33 +125,16 @@ impl Stage {
         // );
         // rasterizer.finish(&mut builder);
 
-        let mut rasterizer = Rasterizer::new();
-
-        // Let's say it's circle
-        builder.color = [15, 201, 52, 255];
-        rasterizer.fill(
-            &[
-                PathCmd::Move(Vec2::new(200.0, 200.0)),
-                PathCmd::Quadratic(Vec2::new(250.0, 200.0), Vec2::new(250.0, 250.0)),
-                PathCmd::Quadratic(Vec2::new(250.0, 300.0), Vec2::new(200.0, 300.0)),
-                PathCmd::Quadratic(Vec2::new(150.0, 300.0), Vec2::new(150.0, 250.0)),
-                PathCmd::Quadratic(Vec2::new(150.0, 200.0), Vec2::new(200.0, 200.0)),
-                PathCmd::Close,
-            ],
-            Transform::id(),
-        );
-        rasterizer.finish(&mut builder);
-
         let vertex_buffer = ctx.new_buffer(
             BufferType::VertexBuffer,
-            BufferUsage::Immutable,
-            BufferSource::slice(&builder.vertices),
+            BufferUsage::Dynamic,
+            BufferSource::empty::<Vertex>(10000),
         );
 
         let index_buffer = ctx.new_buffer(
             BufferType::IndexBuffer,
-            BufferUsage::Immutable,
-            BufferSource::slice(&builder.indices),
+            BufferUsage::Dynamic,
+            BufferSource::empty::<u16>(5000),
         );
 
         let tex = ctx.new_texture_from_data_and_format(
@@ -245,7 +229,11 @@ pub mod shader {
             varying vec4 v_col;
 
             void main() {
-                gl_FragColor = v_col * vec4(1.0, 1.0, 1.0, texture2D(tex, v_uv).r);
+                // gl_FragColor = v_col * vec4(1.0, 1.0, 1.0, texture2D(tex, v_uv).r);
+                gl_FragColor = vec4(1.0 - texture2D(tex, v_uv).r,
+                                    1.0 - texture2D(tex, v_uv).r,
+                                    1.0 - texture2D(tex, v_uv).r,
+                                    1.0);
             }
         "#;
 
