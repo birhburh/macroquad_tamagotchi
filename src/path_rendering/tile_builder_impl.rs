@@ -53,26 +53,30 @@ impl TileBuilder for Builder {
         let v1 = (self.next_row * TILE_SIZE as u16) as i16;
         let v2 = ((self.next_row + 1) * TILE_SIZE as u16) as i16;
 
-        self.vertices.push(Vertex {
-            pos: [x, y],
-            col: self.color,
-            uv: [u1, v1],
-        });
-        self.vertices.push(Vertex {
-            pos: [x + TILE_SIZE as i16, y],
-            col: self.color,
-            uv: [u2, v1],
-        });
-        self.vertices.push(Vertex {
-            pos: [x + TILE_SIZE as i16, y + TILE_SIZE as i16],
-            col: self.color,
-            uv: [u2, v2],
-        });
-        self.vertices.push(Vertex {
-            pos: [x, y + TILE_SIZE as i16],
-            col: self.color,
-            uv: [u1, v2],
-        });
+        // dbg!([u1, u2, v1, v2]);
+
+        self.vertices.extend_from_slice(&[
+            Vertex {
+                pos: [x, y],
+                col: self.color,
+                uv: [u1, v1],
+            },
+            Vertex {
+                pos: [x + TILE_SIZE as i16, y],
+                col: self.color,
+                uv: [u2, v1],
+            },
+            Vertex {
+                pos: [x + TILE_SIZE as i16, y + TILE_SIZE as i16],
+                col: self.color,
+                uv: [u2, v2],
+            },
+            Vertex {
+                pos: [x, y + TILE_SIZE as i16],
+                col: self.color,
+                uv: [u1, v2],
+            },
+        ]);
         self.indices
             .extend_from_slice(&[base, base + 1, base + 2, base, base + 2, base + 3]);
 

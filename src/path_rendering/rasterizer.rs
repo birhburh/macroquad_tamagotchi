@@ -1,8 +1,8 @@
 // Copied from https://github.com/micahrj/ochre
 
-use super::{
-    geom::{Transform, Vec2},
-    path::{flatten, stroke, PathCmd},
+use {
+    super::path::{flatten, stroke, PathCmd},
+    glam::{Affine2, Vec2},
 };
 
 /// The tile size used by the rasterizer (not configurable).
@@ -169,7 +169,7 @@ impl Rasterizer {
 
     /// Adds a path to be rasterized as a filled region, applying the given
     /// transform.
-    pub fn fill(&mut self, path: &[PathCmd], transform: Transform) {
+    pub fn fill(&mut self, path: &[PathCmd], transform: Affine2) {
         for command in path {
             self.command(command.transform(transform));
         }
@@ -177,7 +177,7 @@ impl Rasterizer {
 
     /// Adds a path to be rasterized as a stroke with the given width, applying
     /// the given transform.
-    pub fn stroke(&mut self, path: &[PathCmd], width: f32, transform: Transform) {
+    pub fn stroke(&mut self, path: &[PathCmd], width: f32, transform: Affine2) {
         self.fill(&stroke(&flatten(path, TOLERANCE), width), transform);
     }
 

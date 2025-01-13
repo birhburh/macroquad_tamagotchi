@@ -3,6 +3,7 @@ mod nanolottie;
 mod path_rendering;
 
 use {
+    glam::{Affine2, Mat2},
     macroquad::{
         miniquad::{
             conf::{AppleGfxApi, Platform},
@@ -10,7 +11,7 @@ use {
         },
         prelude::*,
     },
-    path_rendering::{shader, Builder, Mat2x2, PathCmd, Rasterizer, Stage, Transform, ATLAS_SIZE},
+    path_rendering::{shader, Builder, PathCmd, Rasterizer, Stage, ATLAS_SIZE},
     tiny_skia_path::{PathSegment, Point},
 };
 
@@ -33,24 +34,25 @@ fn window_conf() -> Conf {
     }
 }
 
-fn render_node(node: &usvg::Node, builder: &mut Builder, global_transform: Transform) {
+fn render_node(node: &usvg::Node, builder: &mut Builder, global_transform: Affine2) {
     match node {
         usvg::Node::Path(ref p) => {
             let t = node.abs_transform();
-            let transform = Transform::new(
-                Mat2x2::new(t.sx as f32, t.ky as f32, t.kx as f32, t.sy as f32),
-                path_rendering::Vec2::new(t.tx as f32, t.ty as f32),
-            )
-            .then(global_transform);
+            let mut transform = global_transform;
+
+            transform *= Affine2::from_mat2_translation(
+                Mat2::from_cols_array(&[t.sx as f32, t.ky as f32, t.kx as f32, t.sy as f32]),
+                Vec2::new(t.tx as f32, t.ty as f32),
+            );
 
             let mut path = Vec::new();
             for segment in p.data().segments() {
                 match segment {
                     PathSegment::MoveTo(Point { x, y }) => {
-                        path.push(PathCmd::Move(path_rendering::Vec2::new(x as f32, y as f32)));
+                        path.push(PathCmd::Move(Vec2::new(x as f32, y as f32)));
                     }
                     PathSegment::LineTo(Point { x, y }) => {
-                        path.push(PathCmd::Line(path_rendering::Vec2::new(x as f32, y as f32)));
+                        path.push(PathCmd::Line(Vec2::new(x as f32, y as f32)));
                     }
                     PathSegment::CubicTo(
                         Point { x: x1, y: y1 },
@@ -58,15 +60,15 @@ fn render_node(node: &usvg::Node, builder: &mut Builder, global_transform: Trans
                         Point { x, y },
                     ) => {
                         path.push(PathCmd::Cubic(
-                            path_rendering::Vec2::new(x1 as f32, y1 as f32),
-                            path_rendering::Vec2::new(x2 as f32, y2 as f32),
-                            path_rendering::Vec2::new(x as f32, y as f32),
+                            Vec2::new(x1 as f32, y1 as f32),
+                            Vec2::new(x2 as f32, y2 as f32),
+                            Vec2::new(x as f32, y as f32),
                         ));
                     }
                     PathSegment::QuadTo(Point { x: x1, y: y1 }, Point { x: x2, y: y2 }) => {
                         path.push(PathCmd::Quadratic(
-                            path_rendering::Vec2::new(x1 as f32, y1 as f32),
-                            path_rendering::Vec2::new(x2 as f32, y2 as f32),
+                            Vec2::new(x1 as f32, y1 as f32),
+                            Vec2::new(x2 as f32, y2 as f32),
                         ));
                     }
                     PathSegment::Close => {
@@ -100,7 +102,7 @@ fn render_node(node: &usvg::Node, builder: &mut Builder, global_transform: Trans
     }
 }
 
-fn render_nodes(group: &usvg::Group, builder: &mut Builder, global_transform: Transform) {
+fn render_nodes(group: &usvg::Group, builder: &mut Builder, global_transform: Affine2) {
     for child in group.children() {
         render_node(&child, builder, global_transform);
     }
@@ -122,16 +124,17 @@ async fn main() {
         Stage::new(ctx)
     };
 
+    let mut resize = true;
     let mut saved_width = 0.0;
     let mut saved_height = 0.0;
 
     loop {
         clear_background(DARKGRAY);
 
-        if screen_width() != saved_width || screen_height() != saved_height {
+        if resize && (screen_width() != saved_width || screen_height() != saved_height) {
             let gl = unsafe { get_internal_gl() };
 
-            let tiger = true;
+            let tiger = false;
 
             saved_width = screen_width();
             saved_height = screen_height();
@@ -142,15 +145,21 @@ async fn main() {
             } else {
                 50.0
             };
-            let scale = if screen_width() < screen_height() {
+            let mut scale = if screen_width() < screen_height() {
                 screen_width() / side_size * 0.9
             } else {
                 screen_height() / side_size * 0.9
             };
-            let transform = Transform::scale(scale).then(Transform::translate(
+
+            let mut transform = Affine2::from_translation(Vec2::from_array([
                 screen_width() / 2.0 - side_size * scale / 2.0,
                 screen_height() / 2.0 - side_size * scale / 2.0,
-            ));
+            ]));
+            transform *= Affine2::from_scale([scale, scale].into());
+
+            // resize = false;
+            // scale = 2.0;
+            // transform = Affine2::from_scale([scale, scale].into());
 
             if tiger {
                 render_nodes(&tree.root(), &mut stage.builder, transform);
@@ -161,23 +170,17 @@ async fn main() {
                 // Let's say it's circle
                 rasterizer.fill(
                     &[
-                        PathCmd::Move(path_rendering::Vec2::new(0.0, side_size / 2.0)),
+                        PathCmd::Move(Vec2::new(0.0, side_size / 2.0)),
+                        PathCmd::Quadratic(Vec2::new(0.0, 0.0), Vec2::new(side_size / 2.0, 0.0)),
                         PathCmd::Quadratic(
-                            path_rendering::Vec2::new(0.0, 0.0),
-                            path_rendering::Vec2::new(side_size / 2.0, 0.0),
+                            Vec2::new(side_size, 0.0),
+                            Vec2::new(side_size, side_size / 2.0),
                         ),
                         PathCmd::Quadratic(
-                            path_rendering::Vec2::new(side_size, 0.0),
-                            path_rendering::Vec2::new(side_size, side_size / 2.0),
+                            Vec2::new(side_size, side_size),
+                            Vec2::new(side_size / 2.0, side_size),
                         ),
-                        PathCmd::Quadratic(
-                            path_rendering::Vec2::new(side_size, side_size),
-                            path_rendering::Vec2::new(side_size / 2.0, side_size),
-                        ),
-                        PathCmd::Quadratic(
-                            path_rendering::Vec2::new(0.0, side_size),
-                            path_rendering::Vec2::new(0.0, side_size / 2.0),
-                        ),
+                        PathCmd::Line(Vec2::new(0.0, side_size / 2.0)),
                         PathCmd::Close,
                     ],
                     transform,

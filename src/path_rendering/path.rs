@@ -1,6 +1,6 @@
 // Copied from https://github.com/micahrj/ochre
 
-use super::geom::*;
+use glam::{Affine2, Vec2};
 
 /// A single command in a 2-dimensional vector path.
 #[derive(Copy, Clone)]
@@ -15,21 +15,24 @@ pub enum PathCmd {
 
 impl PathCmd {
     /// Applies the given transform to the path command.
-    pub fn transform(&self, transform: Transform) -> PathCmd {
+    pub fn transform(&self, transform: Affine2) -> PathCmd {
         match *self {
-            PathCmd::Move(point) => PathCmd::Move(transform.apply(point)),
-            PathCmd::Line(point) => PathCmd::Line(transform.apply(point)),
-            PathCmd::Quadratic(control, point) => {
-                PathCmd::Quadratic(transform.apply(control), transform.apply(point))
-            }
-            PathCmd::Cubic(control1, control2, point) => PathCmd::Cubic(
-                transform.apply(control1),
-                transform.apply(control2),
-                transform.apply(point),
+            PathCmd::Move(point) => PathCmd::Move(transform.transform_point2(point)),
+            PathCmd::Line(point) => PathCmd::Line(transform.transform_point2(point)),
+            PathCmd::Quadratic(control, point) => PathCmd::Quadratic(
+                transform.transform_point2(control),
+                transform.transform_point2(point),
             ),
-            PathCmd::Conic(control, point, weight) => {
-                PathCmd::Conic(transform.apply(control), transform.apply(point), weight)
-            }
+            PathCmd::Cubic(control1, control2, point) => PathCmd::Cubic(
+                transform.transform_point2(control1),
+                transform.transform_point2(control2),
+                transform.transform_point2(point),
+            ),
+            PathCmd::Conic(control, point, weight) => PathCmd::Conic(
+                transform.transform_point2(control),
+                transform.transform_point2(point),
+                weight,
+            ),
             PathCmd::Close => PathCmd::Close,
         }
     }
@@ -49,9 +52,9 @@ impl PathCmd {
                 let mut t = 0.0;
                 while t < 1.0 {
                     t = (t + dt).min(1.0);
-                    let p01 = Vec2::lerp(t, last, control);
-                    let p12 = Vec2::lerp(t, control, point);
-                    (callback)(PathCmd::Line(Vec2::lerp(t, p01, p12)));
+                    let p01 = Vec2::lerp(last, control, t);
+                    let p12 = Vec2::lerp(control, point, t);
+                    (callback)(PathCmd::Line(Vec2::lerp(p01, p12, t)));
                 }
             }
             PathCmd::Cubic(control1, control2, point) => {
@@ -62,12 +65,12 @@ impl PathCmd {
                 let mut t = 0.0;
                 while t < 1.0 {
                     t = (t + dt).min(1.0);
-                    let p01 = Vec2::lerp(t, last, control1);
-                    let p12 = Vec2::lerp(t, control1, control2);
-                    let p23 = Vec2::lerp(t, control2, point);
-                    let p012 = Vec2::lerp(t, p01, p12);
-                    let p123 = Vec2::lerp(t, p12, p23);
-                    (callback)(PathCmd::Line(Vec2::lerp(t, p012, p123)));
+                    let p01 = Vec2::lerp(last, control1, t);
+                    let p12 = Vec2::lerp(control1, control2, t);
+                    let p23 = Vec2::lerp(control2, point, t);
+                    let p012 = Vec2::lerp(p01, p12, t);
+                    let p123 = Vec2::lerp(p12, p23, t);
+                    (callback)(PathCmd::Line(Vec2::lerp(p012, p123, t)));
                 }
             }
             PathCmd::Conic(control, point, weight) => {
@@ -84,10 +87,10 @@ impl PathCmd {
                     callback: &mut impl FnMut(PathCmd),
                 ) {
                     let t = 0.5 * (t0 + t1);
-                    let p01 = Vec2::lerp(t, last, weight * control);
-                    let p12 = Vec2::lerp(t, weight * control, point);
+                    let p01 = Vec2::lerp(last, weight * control, t);
+                    let p12 = Vec2::lerp(weight * control, point, t);
                     let denom = (1.0 - t) * (1.0 - t) + 2.0 * t * (1.0 - t) * weight + t * t;
-                    let midpoint = (1.0 / denom) * Vec2::lerp(t, p01, p12);
+                    let midpoint = (1.0 / denom) * Vec2::lerp(p01, p12, t);
                     let err = (midpoint - 0.5 * (p0 + p1)).length();
                     if err > tolerance {
                         flatten_conic(

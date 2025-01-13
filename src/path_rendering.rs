@@ -1,6 +1,5 @@
 // Most of it copied from https://github.com/micahrj/ochre
 
-mod geom;
 mod path;
 mod rasterizer;
 mod tile_builder_impl;
@@ -8,10 +7,7 @@ mod tile_builder_impl;
 use {macroquad::miniquad::*, tile_builder_impl::Vertex};
 
 pub use {
-    geom::{Mat2x2, Transform, Vec2},
-    path::PathCmd,
-    rasterizer::Rasterizer,
-    tile_builder_impl::Builder,
+    path::PathCmd, rasterizer::Rasterizer, tile_builder_impl::Builder,
     tile_builder_impl::ATLAS_SIZE,
 };
 
@@ -23,9 +19,7 @@ pub struct Stage {
 
 impl Stage {
     pub fn new(ctx: &mut dyn RenderingBackend) -> Stage {
-        let svg_data = include_bytes!("../res/Ghostscript_Tiger.svg");
-        let tree = usvg::Tree::from_data(svg_data, &usvg::Options::default()).unwrap();
-        let mut builder = Builder::new();
+        let builder = Builder::new();
 
         // let mut rasterizer = Rasterizer::new();
         // builder.color = [152, 0, 152, 255];
