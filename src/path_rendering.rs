@@ -70,11 +70,11 @@ impl Stage {
             .new_shader(
                 match ctx.info().backend {
                     Backend::OpenGl => ShaderSource::Glsl {
-                        vertex: shader::VERTEX,
-                        fragment: shader::FRAGMENT,
+                        vertex: shader::FILLS_VERTEX,
+                        fragment: shader::FILLS_FRAGMENT,
                     },
                     Backend::Metal => ShaderSource::Msl {
-                        program: shader::METAL,
+                        program: shader::FILLS_METAL,
                     },
                 },
                 shader::meta(),
@@ -110,7 +110,7 @@ impl Stage {
 pub mod shader {
     use macroquad::miniquad::*;
 
-    pub const VERTEX: &str = r#"
+    pub const FILLS_VERTEX: &str = r#"
             #version 100
             precision highp float;
 
@@ -130,9 +130,9 @@ pub mod shader {
                 v_uv = uv / vec2(atlas_size);
                 v_col = col / 255.0;
             }
-        "#;
+    "#;
 
-    pub const FRAGMENT: &str = r#"
+    pub const FILLS_FRAGMENT: &str = r#"
             #version 100
             precision highp float;
 
@@ -148,9 +148,9 @@ pub mod shader {
                 //                     1.0 - texture2D(tex, v_uv).r,
                 //                     1.0);
             }
-        "#;
+    "#;
 
-    pub const METAL: &str = r#"
+    pub const FILLS_METAL: &str = r#"
         #include <metal_stdlib>
 
         using namespace metal;

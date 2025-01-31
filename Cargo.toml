@@ -26,14 +26,33 @@ euclid = "0.22.7"
 # nanoserde = {version = "0.2.0-beta.0", default-features = false, features = ["std", "json"]}
 # nanoserde = {path="../nanoserde", default-features = false, features = ["std", "json"]}
 nanoserde = {git = "https://github.com/not-fl3/nanoserde", default-features = false, features = ["std", "json"]}
-serde = { version = "1.0", features = ["derive"] }
-serde_json = "1.0"
+# serde = { version = "1.0", features = ["derive"] }
+# serde_json = "1.0"
 
+# dependencies for ochre code
 usvg = "0.44.0"
 tiny-skia-path = "0.11.4"
 
+# dependencies for pathfinder code
+bitflags = "1.0"
+half = "1.5"
+
+[dependencies.pathfinder_geometry]
+path = "../pathfinder/geometry"
+
+[dependencies.pathfinder_simd]
+path = "../pathfinder/simd"
+
+[dependencies.pathfinder_color]
+path = "../pathfinder/color"
+
+[dependencies.image]
+version = "0.23"
+default-features = false
+features = ["png"]
+
 [patch.crates-io]
-# miniquad = { path="../miniquad", features = ["log-impl"] }
+miniquad = { path="../miniquad", features = ["log-impl"] }
 # miniquad = { git = "https://github.com/birhburh/miniquad", branch = "triangle_strip"}
 # miniquad = { git = "https://github.com/not-fl3/miniquad" }
 
