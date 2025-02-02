@@ -31,7 +31,7 @@ use {
         collections::HashMap,
         f32::consts::{PI, SQRT_2},
         mem,
-    }
+    },
 };
 
 fn window_conf() -> Conf {
@@ -46,7 +46,7 @@ fn window_conf() -> Conf {
         .to_owned(),
         platform: Platform {
             apple_gfx_api,
-            blocking_event_loop: true,
+            // blocking_event_loop: true,
             ..Default::default()
         },
         window_width,
@@ -1196,10 +1196,11 @@ struct Renderer<'a> {
 }
 
 impl<'a> Renderer<'a> {
-    fn new(ctx: &'a mut dyn RenderingBackend, framebuffer_size: Vector2I) -> Renderer<'a> {
-        // device.begin_commands();
-
-        let viewport = RectI::new(Vector2I::default(), framebuffer_size);
+    fn new(ctx: &'a mut dyn RenderingBackend, framebuffer_size: (f32, f32)) -> Renderer<'a> {
+        let viewport = RectI::new(
+            Vector2I::default(),
+            Vector2I::new(framebuffer_size.0 as i32, framebuffer_size.1 as i32),
+        );
 
         let quad_vertex_positions_buffer = ctx.new_buffer(
             BufferType::VertexBuffer,
@@ -1319,7 +1320,8 @@ impl<'a> Renderer<'a> {
                         ],
                     },
                 },
-            ).unwrap();
+            )
+            .unwrap();
 
         let tile_vertex_buffer = ctx.new_buffer(
             BufferType::VertexBuffer,
@@ -1366,8 +1368,6 @@ impl<'a> Renderer<'a> {
             },
         );
 
-        // device.end_commands();
-
         Renderer {
             ctx,
 
@@ -1392,6 +1392,13 @@ impl<'a> Renderer<'a> {
             buffered_fills: vec![],
             pending_fills: vec![],
         }
+    }
+
+    fn update_viewport(&mut self, framebuffer_size: (f32, f32)) {
+        self.viewport = RectI::new(
+            Vector2I::default(),
+            Vector2I::new(framebuffer_size.0 as i32, framebuffer_size.1 as i32),
+        );
     }
 
     fn render(&mut self, scene: Scene) {
@@ -1706,8 +1713,8 @@ fn draw_eyes(
     mouse_position: Vector2F,
     time: f64,
 ) {
-    let time: f64 = 0.0;
-    let mouse_position = Vector2F::new(0.0, 0.0);
+    // let time: f64 = 0.0;
+    // let mouse_position = Vector2F::new(0.0, 0.0);
     let eyes_radii = rect.size() * vec2f(0.23, 0.5);
     let eyes_left_position = rect.origin() + eyes_radii;
     let eyes_right_position = rect.origin() + vec2f(rect.width() - eyes_radii.x(), eyes_radii.y());
@@ -1719,7 +1726,7 @@ fn draw_eyes(
     path.ellipse(eyes_right_position, eyes_radii, 0.0, 0.0, PI_2);
     push_path(scene, transform, path, &rgbu(220, 220, 220));
 
-    let mut delta = (mouse_position - eyes_right_position) / (eyes_radii * 10.0);
+    let mut delta = (mouse_position - eyes_right_position) / (eyes_radii);
     let distance = delta.length();
     if distance > 1.0 {
         delta *= 1.0 / distance;
@@ -1749,16 +1756,22 @@ async fn main() {
     let hidpi_factor = dpi_scale();
 
     let context = unsafe { get_internal_gl().quad_context };
-    let mut renderer = Renderer::new(
-        context,
-        Vector2I::new(framebuffer_size.0 as i32, framebuffer_size.1 as i32),
-    );
+    let mut renderer = Renderer::new(context, framebuffer_size);
+
+    let mut saved_width = 0.0;
+    let mut saved_height = 0.0;
 
     let start_time = get_time();
-    let mut times = 0;
-    let mut exit = false;
     loop {
         clear_background(DARKGRAY);
+
+        if screen_width() != saved_width || screen_height() != saved_height {
+            saved_width = screen_width();
+            saved_height = screen_height();
+
+            framebuffer_size = screen_size();
+            renderer.update_viewport(framebuffer_size);
+        }
 
         let cursor_position = mouse_position();
 
@@ -1793,11 +1806,6 @@ async fn main() {
             frame_start_elapsed_time,
         );
         renderer.render(canvas_scene);
-
-        times += 1;
-        if times > 0 {
-            // break;
-        }
 
         next_frame().await;
     }
