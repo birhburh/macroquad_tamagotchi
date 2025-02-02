@@ -16,7 +16,7 @@ use {
         ShaderMeta, TextureFormat, TextureId, TextureParams, UniformBlockLayout, UniformsSource,
         VertexAttribute, VertexFormat, VertexStep,
     },
-    pathfinder_color::{rgbu, ColorF, ColorU},
+    pathfinder_color::{rgbu, ColorU},
     pathfinder_geometry::{
         line_segment::LineSegment2F,
         rect::{RectF, RectI},
@@ -879,7 +879,7 @@ fn process_line_segment(
             * tile_size;
 
     let mut t_max = (first_tile_crossing - line_segment.from()) / vector;
-    let t_delta = (tile_size / vector).abs();
+    let t_delta = (tile_size / vector).0.abs();
 
     let (mut current_position, mut tile_coords) = (line_segment.from(), from_tile_coords);
     let mut last_step_direction = None;

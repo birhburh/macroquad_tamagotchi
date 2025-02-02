@@ -286,7 +286,7 @@ checksum = "a7a70ba024b9dc04c27ea2f0c0548feb474ec5c54bba33a7f72f873a39d07b24"
 [[package]]
 name = "macroquad"
 version = "0.4.13"
-source = "git+https://github.com/not-fl3/macroquad?rev=2f7f3c8433bbec3bc8829b231db0e19a6f2b5432#2f7f3c8433bbec3bc8829b231db0e19a6f2b5432"
+source = "git+https://github.com/not-fl3/macroquad?rev=b6f43bb868e776540ef8ebebd10299f1aac1c06c#b6f43bb868e776540ef8ebebd10299f1aac1c06c"
 dependencies = [
  "fontdue",
  "glam",
@@ -299,7 +299,7 @@ dependencies = [
 [[package]]
 name = "macroquad_macro"
 version = "0.1.8"
-source = "git+https://github.com/not-fl3/macroquad?rev=2f7f3c8433bbec3bc8829b231db0e19a6f2b5432#2f7f3c8433bbec3bc8829b231db0e19a6f2b5432"
+source = "git+https://github.com/not-fl3/macroquad?rev=b6f43bb868e776540ef8ebebd10299f1aac1c06c#b6f43bb868e776540ef8ebebd10299f1aac1c06c"
 
 [[package]]
 name = "macroquad_tamagotchi"
@@ -342,6 +342,7 @@ dependencies = [
 [[package]]
 name = "miniquad"
 version = "0.4.7"
+source = "git+https://github.com/birhburh/miniquad?branch=clear_vertex_attributes_fix#e83a7a13e2adcff01af341800ac52f7c27b44484"
 dependencies = [
  "libc",
  "ndk-sys",
@@ -445,6 +446,8 @@ checksum = "1261fe7e33c73b354eab43b1273a57c8f967d0391e80353e51f764ac02cf6775"
 [[package]]
 name = "pathfinder_color"
 version = "0.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "69bdc0d277d559e35e1b374de56df9262a6b71e091ca04a8831a239f8c7f0c62"
 dependencies = [
  "pathfinder_simd",
 ]
@@ -452,6 +455,8 @@ dependencies = [
 [[package]]
 name = "pathfinder_geometry"
 version = "0.5.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0b7b7e7b4ea703700ce73ebf128e1450eb69c3a8329199ffbfb9b2a0418e5ad3"
 dependencies = [
  "log",
  "pathfinder_simd",
@@ -460,6 +465,8 @@ dependencies = [
 [[package]]
 name = "pathfinder_simd"
 version = "0.5.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5cf07ef4804cfa9aea3b04a7bbdd5a40031dbb6b4f2cbaf2b011666c80c5b4f2"
 dependencies = [
  "rustc_version",
 ]
@@ -497,9 +504,9 @@ dependencies = [
 
 [[package]]
 name = "proc-macro2"
-version = "1.0.92"
+version = "1.0.93"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "37d3544b3f2748c54e147655edb5025752e2303145b5aefb3c3ea2c78b973bb0"
+checksum = "60946a68e5f9d28b0dc1c21bb8a97ee7d018a8b322fa57838ba31cc878e22d99"
 dependencies = [
  "unicode-ident",
 ]
@@ -615,9 +622,9 @@ dependencies = [
 
 [[package]]
 name = "syn"
-version = "2.0.95"
+version = "2.0.98"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "46f71c0377baf4ef1cc3e3402ded576dccc315800fbc62dfc7fe04b009773b4a"
+checksum = "36147f1a48ae0ec2b5b3bc5b537d267457555a10dc06f3dbc8cb11ba3006d3b1"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -691,9 +698,9 @@ checksum = "260bc6647b3893a9a90668360803a15f96b85a5257b1c3a0c3daf6ae2496de42"
 
 [[package]]
 name = "unicode-ident"
-version = "1.0.14"
+version = "1.0.16"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "adb9e6ca4f869e1180728b7950e35922a7fc6397f7b641499e8f3ef06e50dc83"
+checksum = "a210d160f08b701c8721ba1c726c11662f877ea6b7094007e1ca9a1041945034"
 
 [[package]]
 name = "unicode-properties"
