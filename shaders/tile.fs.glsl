@@ -87,7 +87,8 @@ vec4 calculateColor(sampler2D maskTexture0,
 // TODO(pcwalton): Generate this dynamically.
 
 void main() {
-    // gl_FragColor = vec4(vBaseColor.yzw, 1.0052);
+    // gl_FragColor = vec4(0.01, 0.5, 0.02, 1.0052);
+    // gl_FragColor = vec4(vBaseColor.xyz, 1.0052);
     // gl_FragColor = vec4(texture2D(uMaskTexture0, gl_FragCoord.xy).xyz, 1.0);
     gl_FragColor = calculateColor(uMaskTexture0,
                                   uMaskTextureSize0,

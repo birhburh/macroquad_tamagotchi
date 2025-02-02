@@ -1232,7 +1232,7 @@ impl<'a> Renderer<'a> {
         let texture_metadata_texture = ctx.new_render_texture(TextureParams {
             width: TEXTURE_METADATA_TEXTURE_WIDTH,
             height: TEXTURE_METADATA_TEXTURE_HEIGHT,
-            format: TextureFormat::RGBA8,
+            format: TextureFormat::RGBA16F,
             ..Default::default()
         });
 
@@ -1600,7 +1600,6 @@ impl<'a> Renderer<'a> {
                 ],
                 mask_texture_size0: [texture_size.0 as f32, texture_size.1 as f32],
             }));
-        // self.ctx.draw(0, 6, tiles.len().try_into().unwrap());
         self.ctx.draw(0, 6, tiles.len().try_into().unwrap());
         self.ctx.end_render_pass();
 
@@ -1619,7 +1618,7 @@ impl<'a> Renderer<'a> {
         let mask_img = self.ctx.new_render_texture(TextureParams {
             width: MASK_FRAMEBUFFER_WIDTH,
             height: MASK_FRAMEBUFFER_HEIGHT * alpha_tile_pages_needed,
-            format: TextureFormat::RGBA8,
+            format: TextureFormat::RGBA16F,
             ..Default::default()
         });
 

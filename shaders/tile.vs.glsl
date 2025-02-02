@@ -39,7 +39,6 @@ vec4 fetchUnscaled(sampler2D srcTexture, vec2 scale, vec2 originCoord, float ent
 void main() {
     vec2 tileOrigin = vec2(aTileOrigin), tileOffset = vec2(aTileOffset);
     vec2 position = (tileOrigin + tileOffset) * uTileSize;
-    gl_Position = vec4(aPathIndex);
 
     vec2 maskTileCoord = vec2(aMaskTexCoord0.x, aMaskTexCoord0.y + 256.0 * aMaskTexCoord0.z);
     vec2 maskTexCoord0 = (vec2(maskTileCoord) + tileOffset) * uTileSize;
