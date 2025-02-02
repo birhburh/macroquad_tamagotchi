@@ -26,13 +26,12 @@ use {
         util::{alignup_i32, lerp},
         vector::{vec2f, vec2i, IntoVector2F, Vector2F, Vector2I, Vector4F},
     },
-    pathfinder_simd::x86::{F32x2, F32x4, U32x2},
+    pathfinder_simd::default::{F32x2, F32x4, U32x2},
     std::{
         collections::HashMap,
         f32::consts::{PI, SQRT_2},
         mem,
-        time::Instant,
-    },
+    }
 };
 
 fn window_conf() -> Conf {
@@ -61,7 +60,7 @@ const PI_2: f32 = PI * 2.0;
 const EPSILON: f32 = 0.001;
 
 static QUAD_VERTEX_POSITIONS: [f32; 8] = [0.0, 0.0, 1.0, 0.0, 1.0, 1.0, 0.0, 1.0];
-static QUAD_VERTEX_INDICES: [u32; 6] = [0, 1, 3, 1, 2, 3];
+static QUAD_VERTEX_INDICES: [u16; 6] = [0, 1, 3, 1, 2, 3];
 
 const TEXTURE_METADATA_ENTRIES_PER_ROW: u32 = 128;
 const TEXTURE_METADATA_TEXTURE_WIDTH: u32 = TEXTURE_METADATA_ENTRIES_PER_ROW;
@@ -1181,12 +1180,8 @@ fn clip_line_segment_to_rect(
 struct Renderer<'a> {
     ctx: &'a mut dyn RenderingBackend,
     viewport: RectI,
-    window_size: Vector2I,
     background_color: ColorU,
-    quad_vertex_positions_buffer_id: BufferId,
-    quad_vertex_indices_buffer_id: BufferId,
-    area_lut_texture_id: TextureId,
-    texture_metadata_texture_id: TextureId,
+    texture_metadata_texture: TextureId,
     mask_storage: Option<MaskStorage>,
     alpha_tile_count: u32,
     framebuffer_flags: FramebufferFlags,
@@ -1194,8 +1189,8 @@ struct Renderer<'a> {
     fill_bindings: Bindings,
     tile_pipeline: Pipeline,
     tile_bindings: Bindings,
-    quads_vertex_indices_buffer_id: Option<BufferId>,
-    quads_vertex_indices_length: usize,
+    tiles_vertex_indices_buffer: Option<BufferId>,
+    tiles_vertex_indices_length: usize,
     buffered_fills: Vec<Fill>,
     pending_fills: Vec<Fill>,
 }
@@ -1206,14 +1201,14 @@ impl<'a> Renderer<'a> {
 
         let viewport = RectI::new(Vector2I::default(), framebuffer_size);
 
-        let quad_vertex_positions_buffer_id = ctx.new_buffer(
+        let quad_vertex_positions_buffer = ctx.new_buffer(
             BufferType::VertexBuffer,
-            BufferUsage::Dynamic,
+            BufferUsage::Immutable,
             BufferSource::slice(&QUAD_VERTEX_POSITIONS),
         );
-        let quad_vertex_indices_buffer_id = ctx.new_buffer(
+        let quad_vertex_indices_buffer = ctx.new_buffer(
             BufferType::IndexBuffer,
-            BufferUsage::Dynamic,
+            BufferUsage::Immutable,
             BufferSource::slice(&QUAD_VERTEX_INDICES),
         );
 
@@ -1234,14 +1229,14 @@ impl<'a> Renderer<'a> {
             },
         );
 
-        let texture_metadata_texture_id = ctx.new_render_texture(TextureParams {
+        let texture_metadata_texture = ctx.new_render_texture(TextureParams {
             width: TEXTURE_METADATA_TEXTURE_WIDTH,
             height: TEXTURE_METADATA_TEXTURE_HEIGHT,
-            format: TextureFormat::RGBA16F,
+            format: TextureFormat::RGBA8,
             ..Default::default()
         });
 
-        let fill_buffer_id = ctx.new_buffer(
+        let fill_buffer = ctx.new_buffer(
             BufferType::VertexBuffer,
             BufferUsage::Immutable,
             BufferSource::empty::<Fill>(0),
@@ -1269,8 +1264,8 @@ impl<'a> Renderer<'a> {
             .unwrap();
 
         let fill_bindings = Bindings {
-            vertex_buffers: vec![quad_vertex_positions_buffer_id, fill_buffer_id],
-            index_buffer: quad_vertex_indices_buffer_id,
+            vertex_buffers: vec![quad_vertex_positions_buffer, fill_buffer],
+            index_buffer: quad_vertex_indices_buffer,
             images: vec![area_lut_texture_id],
         };
 
@@ -1317,26 +1312,25 @@ impl<'a> Renderer<'a> {
                     images: vec!["uTextureMetadata".into(), "uMaskTexture0".into()],
                     uniforms: UniformBlockLayout {
                         uniforms: vec![
-                            UniformDesc::new("uTransform", UniformType::Float4),
+                            UniformDesc::new("uTransform", UniformType::Mat4),
                             UniformDesc::new("uTileSize", UniformType::Float2),
                             UniformDesc::new("uTextureMetadataSize", UniformType::Int2),
                             UniformDesc::new("uMaskTextureSize0", UniformType::Float2),
                         ],
                     },
                 },
-            )
-            .unwrap();
+            ).unwrap();
 
-        let tile_vertex_buffer_id = ctx.new_buffer(
+        let tile_vertex_buffer = ctx.new_buffer(
             BufferType::VertexBuffer,
             BufferUsage::Immutable,
             BufferSource::empty::<Tile>(0),
         );
 
         let tile_bindings = Bindings {
-            vertex_buffers: vec![quad_vertex_positions_buffer_id, tile_vertex_buffer_id],
-            index_buffer: quad_vertex_indices_buffer_id,
-            images: vec![texture_metadata_texture_id, texture_metadata_texture_id],
+            vertex_buffers: vec![quad_vertex_positions_buffer, tile_vertex_buffer],
+            index_buffer: quad_vertex_indices_buffer,
+            images: vec![texture_metadata_texture, texture_metadata_texture],
         };
 
         let tile_pipeline = ctx.new_pipeline(
@@ -1351,10 +1345,10 @@ impl<'a> Renderer<'a> {
             &[
                 VertexAttribute::with_buffer("aTileOffset", VertexFormat::Float2, 0),
                 VertexAttribute::with_buffer("aTileOrigin", VertexFormat::Float2, 1),
-                VertexAttribute::with_buffer("aMaskTexCoord0", VertexFormat::Float3, 1),
-                VertexAttribute::with_buffer("aCtrlBackdrop", VertexFormat::Float2, 1),
-                VertexAttribute::with_buffer("aColor", VertexFormat::Float1, 1),
+                VertexAttribute::with_buffer("aMaskTexCoord0", VertexFormat::Float4, 1),
                 VertexAttribute::with_buffer("aPathIndex", VertexFormat::Float1, 1),
+                VertexAttribute::with_buffer("aColor", VertexFormat::Float1, 1),
+                VertexAttribute::with_buffer("aCtrlBackdrop", VertexFormat::Float2, 1),
             ],
             tile_shader,
             PipelineParams {
@@ -1378,18 +1372,13 @@ impl<'a> Renderer<'a> {
             ctx,
 
             viewport,
-            window_size: framebuffer_size,
 
             background_color: rgbu(77, 77, 82),
 
-            quad_vertex_positions_buffer_id,
-            quad_vertex_indices_buffer_id,
-            quads_vertex_indices_buffer_id: None,
-            quads_vertex_indices_length: 0,
+            tiles_vertex_indices_buffer: None,
+            tiles_vertex_indices_length: 0,
 
-            area_lut_texture_id,
-
-            texture_metadata_texture_id,
+            texture_metadata_texture,
             mask_storage: None,
             alpha_tile_count: 0,
             framebuffer_flags: FramebufferFlags::empty(),
@@ -1486,7 +1475,7 @@ impl<'a> Renderer<'a> {
             .flat_map(|&f| f.to_f32().to_bits().to_le_bytes())
             .collect();
         self.ctx.texture_resize(
-            self.texture_metadata_texture_id,
+            self.texture_metadata_texture,
             width,
             height,
             Some(&texels_u8),
@@ -1521,7 +1510,7 @@ impl<'a> Renderer<'a> {
         debug_assert!(!self.buffered_fills.is_empty());
         debug_assert!(self.buffered_fills.len() <= u32::MAX as usize);
 
-        let old_fill_buffer_id = self.fill_bindings.vertex_buffers[1];
+        let old_fill_buffer = self.fill_bindings.vertex_buffers[1];
         self.fill_bindings.vertex_buffers[1] = self.ctx.new_buffer(
             BufferType::VertexBuffer,
             BufferUsage::Dynamic,
@@ -1533,7 +1522,7 @@ impl<'a> Renderer<'a> {
 
         self.draw_fills(fill_count);
         self.ctx.delete_buffer(self.fill_bindings.vertex_buffers[1]);
-        self.fill_bindings.vertex_buffers[1] = old_fill_buffer_id;
+        self.fill_bindings.vertex_buffers[1] = old_fill_buffer;
     }
 
     fn draw_fills(&mut self, fill_count: u32) {
@@ -1630,7 +1619,7 @@ impl<'a> Renderer<'a> {
         let mask_img = self.ctx.new_render_texture(TextureParams {
             width: MASK_FRAMEBUFFER_WIDTH,
             height: MASK_FRAMEBUFFER_HEIGHT * alpha_tile_pages_needed,
-            format: TextureFormat::RGBA16F,
+            format: TextureFormat::RGBA8,
             ..Default::default()
         });
 
@@ -1656,11 +1645,11 @@ impl<'a> Renderer<'a> {
 
     fn ensure_index_buffer(&mut self, mut length: usize) {
         length = length.next_power_of_two();
-        if self.quads_vertex_indices_length >= length {
+        if self.tiles_vertex_indices_length >= length {
             return;
         }
-        let mut indices: Vec<u32> = Vec::with_capacity(length * 6);
-        for index in 0..(length as u32) {
+        let mut indices: Vec<u16> = Vec::with_capacity(length * 6);
+        for index in 0..(length as u16) {
             indices.extend_from_slice(&[
                 index * 4,
                 index * 4 + 1,
@@ -1671,16 +1660,16 @@ impl<'a> Renderer<'a> {
             ]);
         }
 
-        if let Some(quads_vertex_indices_buffer_id) = self.quads_vertex_indices_buffer_id.take() {
-            self.ctx.delete_buffer(quads_vertex_indices_buffer_id);
+        if let Some(tiles_vertex_indices_buffer) = self.tiles_vertex_indices_buffer.take() {
+            self.ctx.delete_buffer(tiles_vertex_indices_buffer);
         }
-        let quads_vertex_indices_buffer_id = self.ctx.new_buffer(
+        let tiles_vertex_indices_buffer = self.ctx.new_buffer(
             BufferType::IndexBuffer,
             BufferUsage::Immutable,
             BufferSource::slice(&indices),
         );
-        self.quads_vertex_indices_buffer_id = Some(quads_vertex_indices_buffer_id);
-        self.quads_vertex_indices_length = length;
+        self.tiles_vertex_indices_buffer = Some(tiles_vertex_indices_buffer);
+        self.tiles_vertex_indices_length = length;
     }
 
     fn tile_transform(&self) -> Transform4F {
@@ -1716,15 +1705,15 @@ fn draw_eyes(
     transform: &Transform2F,
     rect: RectF,
     mouse_position: Vector2F,
-    time: f32,
+    time: f64,
 ) {
-    let time: f32 = 0.0;
+    let time: f64 = 0.0;
     let mouse_position = Vector2F::new(0.0, 0.0);
     let eyes_radii = rect.size() * vec2f(0.23, 0.5);
     let eyes_left_position = rect.origin() + eyes_radii;
     let eyes_right_position = rect.origin() + vec2f(rect.width() - eyes_radii.x(), eyes_radii.y());
     let eyes_center = f32::min(eyes_radii.x(), eyes_radii.y()) * 0.5;
-    let blink = 1.0 - f32::powf((time * 0.5).sin(), 200.0) * 0.8;
+    let blink = (1.0 - f64::powf((time * 0.5).sin(), 200.0) * 0.8) as f32;
 
     let mut path = Path2D::new();
     path.ellipse(eyes_left_position, eyes_radii, 0.0, 0.0, PI_2);
@@ -1766,7 +1755,7 @@ async fn main() {
         Vector2I::new(framebuffer_size.0 as i32, framebuffer_size.1 as i32),
     );
 
-    let start_time = Instant::now();
+    let start_time = get_time();
     let mut times = 0;
     let mut exit = false;
     loop {
@@ -1784,8 +1773,8 @@ async fn main() {
         let mut transform = Transform2F::default();
         transform *= Transform2F::from_scale(hidpi_factor as f32);
 
-        let frame_start_time = Instant::now();
-        let frame_start_elapsed_time = (frame_start_time - start_time).as_secs_f32();
+        let frame_start_time = get_time();
+        let frame_start_elapsed_time = frame_start_time - start_time;
         draw_eyes(
             &mut canvas_scene,
             &transform,

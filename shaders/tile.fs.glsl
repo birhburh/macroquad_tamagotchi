@@ -48,8 +48,15 @@ float sampleMask(float maskAlpha,
                  vec3 maskTexCoord) {
     vec2 maskTexCoordI = floor(maskTexCoord.xy);
     vec4 texel = texture2D(maskTexture, (vec2(floor(maskTexCoordI / vec2(1, 4))) + 0.5) / maskTextureSize);
-    float coverage = texel[int(mod(maskTexCoordI.y, 4.0))] + maskTexCoord.z;
+    float coverage;
+    int index = int(mod(maskTexCoordI.y, 4.0));
 
+    if (index == 0) coverage = texel.r;
+    else if (index == 1) coverage = texel.g;
+    else if (index == 2) coverage = texel.b;
+    else coverage = texel.a;
+
+    coverage += maskTexCoord.z;
     coverage = abs(coverage);
     return min(maskAlpha, coverage);
 }
