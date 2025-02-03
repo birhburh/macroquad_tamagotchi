@@ -5,17 +5,16 @@ extern crate bitflags;
 
 use {
     macroquad::{
-        miniquad::conf::{AppleGfxApi, Platform},
+        miniquad::{
+            conf::{AppleGfxApi, Platform},
+            window::{dpi_scale, screen_size},
+            Backend, Bindings, BlendFactor, BlendState, BlendValue, BufferId, BufferLayout,
+            BufferSource, BufferType, BufferUsage, Equation, PassAction, Pipeline,
+            RenderingBackend, ShaderMeta, TextureFormat, TextureId, TextureParams,
+            UniformBlockLayout, UniformsSource, VertexAttribute, VertexFormat, VertexStep,
+        },
         prelude::*,
     },
-    miniquad::{
-        window::{dpi_scale, screen_size},
-        Backend, Bindings, BlendFactor, BlendState, BlendValue, BufferId, BufferLayout,
-        BufferSource, BufferType, BufferUsage, Equation, PassAction, Pipeline, RenderingBackend,
-        ShaderMeta, TextureFormat, TextureId, TextureParams, UniformBlockLayout, UniformsSource,
-        VertexAttribute, VertexFormat, VertexStep,
-    },
-    pathfinder_color::{rgbu, ColorU},
     pathfinder_geometry::{
         line_segment::LineSegment2F,
         rect::{RectF, RectI},
@@ -29,6 +28,7 @@ use {
     std::{
         collections::HashMap,
         f32::consts::{PI, SQRT_2},
+        hash::Hash,
         mem,
     },
 };
@@ -39,10 +39,7 @@ fn window_conf() -> Conf {
     let window_width = 600;
     let window_height = window_width * 3 / 4;
     Conf {
-        window_title: format!(
-            "OUR BELOVED MASCOT"
-        )
-        .to_owned(),
+        window_title: format!("OUR BELOVED MASCOT").to_owned(),
         platform: Platform {
             apple_gfx_api,
             // blocking_event_loop: true,
@@ -727,11 +724,25 @@ bitflags! {
     }
 }
 
+#[derive(Clone, Default, PartialEq)]
+struct HashedColor(Color);
+
+impl Hash for HashedColor {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        (self.0.r as u8 * 255).hash(state);
+        (self.0.g as u8 * 255).hash(state);
+        (self.0.b as u8 * 255).hash(state);
+        (self.0.a as u8 * 255).hash(state);
+    }
+}
+
+impl Eq for HashedColor {}
+
 #[derive(Clone, Default)]
 struct Scene {
     paths: Vec<Path>,
-    colors: Vec<ColorU>,
-    cache: HashMap<ColorU, PaintId>,
+    colors: Vec<Color>,
+    cache: HashMap<HashedColor, PaintId>,
     bounds: RectF,
     view_box: RectF,
 }
@@ -1221,7 +1232,7 @@ fn clip_line_segment_to_rect(
 struct Renderer<'a> {
     ctx: &'a mut dyn RenderingBackend,
     viewport: RectI,
-    background_color: ColorU,
+    background_color: Color,
     texture_metadata_texture: TextureId,
     mask_storage: Option<MaskStorage>,
     alpha_tile_count: u32,
@@ -1413,7 +1424,7 @@ impl<'a> Renderer<'a> {
 
             viewport,
 
-            background_color: rgbu(116, 200, 214),
+            background_color: color_u8!(116, 200, 214, 255),
 
             tiles_vertex_indices_buffer: None,
             tiles_vertex_indices_length: 0,
@@ -1492,20 +1503,15 @@ impl<'a> Renderer<'a> {
         // self.device.end_commands();
     }
 
-    fn upload_palette(&mut self, metadata: &Vec<ColorU>) {
+    fn upload_palette(&mut self, metadata: &Vec<Color>) {
         let entries_per_row = TEXTURE_METADATA_ENTRIES_PER_ROW.try_into().unwrap();
         let texture_width: i32 = TEXTURE_METADATA_TEXTURE_WIDTH.try_into().unwrap();
         let padded_texel_size =
             (alignup_i32(metadata.len() as i32, entries_per_row) * texture_width * 4) as usize;
         let mut texels = Vec::with_capacity(padded_texel_size);
         for base_color in metadata {
-            let texel = &[
-                base_color.r,
-                base_color.g,
-                base_color.b,
-                base_color.a,
-            ];
-            texels.extend_from_slice(texel);
+            let texel: [u8; 4] = (*base_color).into();
+            texels.extend_from_slice(&texel);
         }
         while texels.len() < padded_texel_size {
             texels.push(u8::default())
@@ -1513,12 +1519,8 @@ impl<'a> Renderer<'a> {
 
         let width = TEXTURE_METADATA_TEXTURE_WIDTH;
         let height = texels.len() as u32 / (4 * TEXTURE_METADATA_TEXTURE_WIDTH);
-        self.ctx.texture_resize(
-            self.texture_metadata_texture,
-            width,
-            height,
-            Some(&texels),
-        );
+        self.ctx
+            .texture_resize(self.texture_metadata_texture, width, height, Some(&texels));
     }
 
     fn add_fills(&mut self, added_fills: &[Fill], first_el: usize, last_el: usize) {
@@ -1611,13 +1613,13 @@ impl<'a> Renderer<'a> {
 
         self.ensure_index_buffer(tiles.len());
 
-        let clear_color = self.background_color.to_f32();
+        let clear_color = self.background_color;
 
         self.ctx.begin_default_pass(PassAction::clear_color(
-            clear_color.r(),
-            clear_color.g(),
-            clear_color.b(),
-            clear_color.a(),
+            clear_color.r,
+            clear_color.g,
+            clear_color.b,
+            clear_color.a,
         ));
         self.ctx.apply_pipeline(&self.tile_pipeline);
         self.ctx.apply_bindings(&self.tile_bindings);
@@ -1717,7 +1719,7 @@ impl<'a> Renderer<'a> {
     }
 }
 
-fn push_path(scene: &mut Scene, transform: &Transform2F, mut path: Path2D, color: &ColorU) {
+fn push_path(scene: &mut Scene, transform: &Transform2F, mut path: Path2D, color: &Color) {
     let paint_id = push_color(scene, color);
     path.flush_current_contour();
     let mut outline = path.outline;
@@ -1727,13 +1729,13 @@ fn push_path(scene: &mut Scene, transform: &Transform2F, mut path: Path2D, color
     scene.bounds = scene.bounds.union_rect(new_path_bounds);
 }
 
-fn push_color(scene: &mut Scene, base_color: &ColorU) -> PaintId {
-    if let Some(paint_id) = scene.cache.get(base_color) {
+fn push_color(scene: &mut Scene, base_color: &Color) -> PaintId {
+    if let Some(paint_id) = scene.cache.get(&HashedColor(*base_color)) {
         return *paint_id;
     }
 
     let paint_id = PaintId(scene.colors.len() as u16);
-    scene.cache.insert(*base_color, paint_id);
+    scene.cache.insert(HashedColor(*base_color), paint_id);
     scene.colors.push(*base_color);
     paint_id
 }
@@ -1748,8 +1750,7 @@ fn draw_eyes(
 ) {
     // let time: f64 = 0.0;
     // let mouse_position = Vector2F::new(0.0, 0.0);
-    let eyes_rect =
-    RectF::new(
+    let eyes_rect = RectF::new(
         vec2f(
             framebuffer_size.0 as f32 / hidpi_factor as f32 / 2.
                 - ((framebuffer_size.0 * 0.9) / 4.0) as f32,
@@ -1763,14 +1764,15 @@ fn draw_eyes(
     );
     let eyes_radii = eyes_rect.size() * vec2f(0.23, 0.35);
     let eyes_left_position = eyes_rect.origin() + eyes_radii;
-    let eyes_right_position = eyes_rect.origin() + vec2f(eyes_rect.width() - eyes_radii.x(), eyes_radii.y());
+    let eyes_right_position =
+        eyes_rect.origin() + vec2f(eyes_rect.width() - eyes_radii.x(), eyes_radii.y());
     let eyes_center = f32::min(eyes_radii.x(), eyes_radii.y()) * 0.4;
     let blink = (1.0 - f64::powf((time * 0.5).sin(), 200.0) * 0.8) as f32;
 
     let mut path = Path2D::new();
     path.ellipse(eyes_left_position, eyes_radii, 0.0, 0.0, PI_2);
     path.ellipse(eyes_right_position, eyes_radii, 0.0, 0.0, PI_2);
-    push_path(scene, transform, path, &rgbu(220, 220, 220));
+    push_path(scene, transform, path, &color_u8!(220, 220, 220, 255));
 
     let mut delta = (mouse_position - eyes_right_position) / (eyes_radii);
     let distance = delta.length();
@@ -1793,58 +1795,111 @@ fn draw_eyes(
         0.0,
         PI_2,
     );
-    push_path(scene, transform, path, &rgbu(32, 32, 32));
+    push_path(scene, transform, path, &color_u8!(32, 32, 32, 255));
 
     let mut path = Path2D::new();
     path.ellipse(
-        eyes_left_position + delta + vec2f(eyes_center * 0.5, eyes_radii.y() * 0.25 * (1.0 - blink) + eyes_center * 0.75 * (blink - 0.5)),
+        eyes_left_position
+            + delta
+            + vec2f(
+                eyes_center * 0.5,
+                eyes_radii.y() * 0.25 * (1.0 - blink) + eyes_center * 0.75 * (blink - 0.5),
+            ),
         vec2f(eyes_center * 0.2, eyes_center * 0.25),
         0.0,
         0.0,
         PI_2,
     );
     path.ellipse(
-        eyes_right_position + delta + vec2f(eyes_center * 0.5, eyes_radii.y() * 0.25 * (1.0 - blink) + eyes_center * 0.75 * (blink - 0.5)),
+        eyes_right_position
+            + delta
+            + vec2f(
+                eyes_center * 0.5,
+                eyes_radii.y() * 0.25 * (1.0 - blink) + eyes_center * 0.75 * (blink - 0.5),
+            ),
         vec2f(eyes_center * 0.2, eyes_center * 0.25),
         0.0,
         0.0,
         PI_2,
     );
-    push_path(scene, transform, path, &rgbu(220, 220, 220));
+    push_path(scene, transform, path, &color_u8!(220, 220, 220, 255));
 
     let mut path = Path2D::new();
-    let tooth_pos = vec2f(framebuffer_size.0 / hidpi_factor as f32, framebuffer_size.1 / hidpi_factor as f32) * vec2f(0.45, 0.83);
+    let tooth_pos = vec2f(
+        framebuffer_size.0 / hidpi_factor as f32,
+        framebuffer_size.1 / hidpi_factor as f32,
+    ) * vec2f(0.45, 0.83);
     path.move_to(tooth_pos);
     path.line_to(tooth_pos * vec2f(1.0, 1.1));
-    path.bezier_curve_to(tooth_pos * vec2f(1.0, 1.15), tooth_pos * vec2f(1.1, 1.15), tooth_pos * vec2f(1.1, 1.1));
+    path.bezier_curve_to(
+        tooth_pos * vec2f(1.0, 1.15),
+        tooth_pos * vec2f(1.1, 1.15),
+        tooth_pos * vec2f(1.1, 1.1),
+    );
     path.line_to(tooth_pos * vec2f(1.1, 1.0));
     path.close_path();
-    push_path(scene, transform, path, &rgbu(220, 220, 220));
+    push_path(scene, transform, path, &color_u8!(220, 220, 220, 255));
 
     let mut path = Path2D::new();
-    let tooth_pos = vec2f(framebuffer_size.0 / hidpi_factor as f32, framebuffer_size.1 / hidpi_factor as f32) * vec2f(0.5, 0.83);
+    let tooth_pos = vec2f(
+        framebuffer_size.0 / hidpi_factor as f32,
+        framebuffer_size.1 / hidpi_factor as f32,
+    ) * vec2f(0.5, 0.83);
     path.move_to(tooth_pos);
     path.line_to(tooth_pos * vec2f(1.0, 1.1));
-    path.bezier_curve_to(tooth_pos * vec2f(1.0, 1.15), tooth_pos * vec2f(1.1, 1.15), tooth_pos * vec2f(1.1, 1.1));
+    path.bezier_curve_to(
+        tooth_pos * vec2f(1.0, 1.15),
+        tooth_pos * vec2f(1.1, 1.15),
+        tooth_pos * vec2f(1.1, 1.1),
+    );
     path.line_to(tooth_pos * vec2f(1.1, 1.0));
     path.close_path();
-    push_path(scene, transform, path, &rgbu(220, 220, 220));
+    push_path(scene, transform, path, &color_u8!(220, 220, 220, 255));
 
     let mut path = Path2D::new();
-    let mouth_pos = vec2f(framebuffer_size.0 / hidpi_factor as f32, framebuffer_size.1 / hidpi_factor as f32) * vec2f(0.68, 0.75);
+    let mouth_pos = vec2f(
+        framebuffer_size.0 / hidpi_factor as f32,
+        framebuffer_size.1 / hidpi_factor as f32,
+    ) * vec2f(0.68, 0.75);
     path.move_to(mouth_pos);
-    path.bezier_curve_to(mouth_pos * vec2f(0.85, 0.85), mouth_pos * vec2f(0.65, 0.85), mouth_pos * vec2f(0.5, 1.0));
-    path.bezier_curve_to(mouth_pos * vec2f(0.43, 1.08), mouth_pos * vec2f(0.43, 1.16), mouth_pos * vec2f(0.5, 1.2));
-    path.bezier_curve_to(mouth_pos * vec2f(0.5, 1.21), mouth_pos * vec2f(0.6, 1.21), mouth_pos * vec2f(0.65, 1.15));
-    path.bezier_curve_to(mouth_pos * vec2f(0.65, 1.15), mouth_pos * vec2f(0.75, 1.07), mouth_pos * vec2f(0.85, 1.15));
-    path.bezier_curve_to(mouth_pos * vec2f(0.9, 1.17), mouth_pos * vec2f(0.95, 1.2), mouth_pos * vec2f(1.0, 1.2));
-    path.bezier_curve_to(mouth_pos * vec2f(1.09, 1.15), mouth_pos * vec2f(1.05, 1.05), mouth_pos * vec2f(1.0, 1.0));
+    path.bezier_curve_to(
+        mouth_pos * vec2f(0.85, 0.85),
+        mouth_pos * vec2f(0.65, 0.85),
+        mouth_pos * vec2f(0.5, 1.0),
+    );
+    path.bezier_curve_to(
+        mouth_pos * vec2f(0.43, 1.08),
+        mouth_pos * vec2f(0.43, 1.16),
+        mouth_pos * vec2f(0.5, 1.2),
+    );
+    path.bezier_curve_to(
+        mouth_pos * vec2f(0.5, 1.21),
+        mouth_pos * vec2f(0.6, 1.21),
+        mouth_pos * vec2f(0.65, 1.15),
+    );
+    path.bezier_curve_to(
+        mouth_pos * vec2f(0.65, 1.15),
+        mouth_pos * vec2f(0.75, 1.07),
+        mouth_pos * vec2f(0.85, 1.15),
+    );
+    path.bezier_curve_to(
+        mouth_pos * vec2f(0.9, 1.17),
+        mouth_pos * vec2f(0.95, 1.2),
+        mouth_pos * vec2f(1.0, 1.2),
+    );
+    path.bezier_curve_to(
+        mouth_pos * vec2f(1.09, 1.15),
+        mouth_pos * vec2f(1.05, 1.05),
+        mouth_pos * vec2f(1.0, 1.0),
+    );
     path.close_path();
-    push_path(scene, transform, path, &rgbu(246, 210, 165));
-
+    push_path(scene, transform, path, &color_u8!(246, 210, 165, 255));
 
     let mut path = Path2D::new();
-    let nose_pos = vec2f(framebuffer_size.0 / hidpi_factor as f32, framebuffer_size.1 / hidpi_factor as f32) * vec2f(0.5, 0.7);
+    let nose_pos = vec2f(
+        framebuffer_size.0 / hidpi_factor as f32,
+        framebuffer_size.1 / hidpi_factor as f32,
+    ) * vec2f(0.5, 0.7);
     path.ellipse(
         nose_pos,
         vec2f(eyes_center, eyes_center * 0.7),
@@ -1852,7 +1907,7 @@ fn draw_eyes(
         0.0,
         PI_2,
     );
-    push_path(scene, transform, path, &rgbu(32, 32, 32));
+    push_path(scene, transform, path, &color_u8!(32, 32, 32, 255));
 }
 
 #[macroquad::main(window_conf)]
