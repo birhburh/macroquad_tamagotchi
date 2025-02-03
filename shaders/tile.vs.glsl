@@ -25,9 +25,8 @@ uniform ivec2 uTextureMetadataSize;
 attribute vec2 aTileOffset;
 attribute vec2 aTileOrigin;
 attribute vec4 aMaskTexCoord0;
-attribute vec2 aCtrlBackdrop;
-attribute float aPathIndex;
 attribute float aColor;
+attribute vec2 aCtrlBackdrop;
 
 varying vec3 vMaskTexCoord0;
 varying vec4 vBaseColor;

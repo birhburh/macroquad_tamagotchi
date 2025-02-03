@@ -4,7 +4,6 @@
 extern crate bitflags;
 
 use {
-    half::f16,
     macroquad::{
         miniquad::conf::{AppleGfxApi, Platform},
         prelude::*,
@@ -41,7 +40,7 @@ fn window_conf() -> Conf {
     let window_height = window_width * 3 / 4;
     Conf {
         window_title: format!(
-            "RAVG Example (apple_gfx_api = {apple_gfx_api:?}, high_dpi = {high_dpi})"
+            "OUR BELOVED MASCOT"
         )
         .to_owned(),
         platform: Platform {
@@ -112,6 +111,32 @@ impl Path2D {
             outline: Outline::new(),
             current_contour: Contour::new(),
         }
+    }
+
+    #[inline]
+    pub fn close_path(&mut self) {
+        self.current_contour.close();
+    }
+
+    #[inline]
+    pub fn move_to(&mut self, to: Vector2F) {
+        self.flush_current_contour();
+        self.current_contour.push_endpoint(to);
+    }
+
+    #[inline]
+    pub fn line_to(&mut self, to: Vector2F) {
+        self.current_contour.push_endpoint(to);
+    }
+
+    #[inline]
+    pub fn quadratic_curve_to(&mut self, ctrl: Vector2F, to: Vector2F) {
+        self.current_contour.push_quadratic(ctrl, to);
+    }
+
+    #[inline]
+    pub fn bezier_curve_to(&mut self, ctrl0: Vector2F, ctrl1: Vector2F, to: Vector2F) {
+        self.current_contour.push_cubic(ctrl0, ctrl1, to);
     }
 
     fn ellipse<A>(
@@ -369,6 +394,24 @@ impl Contour {
         }
 
         self.push_point(segment.baseline.to(), PointFlags::empty(), update_bounds);
+    }
+
+    #[inline]
+    pub fn push_endpoint(&mut self, to: Vector2F) {
+        self.push_point(to, PointFlags::empty(), true);
+    }
+
+    #[inline]
+    pub fn push_quadratic(&mut self, ctrl: Vector2F, to: Vector2F) {
+        self.push_point(ctrl, PointFlags::CONTROL_POINT_0, true);
+        self.push_point(to, PointFlags::empty(), true);
+    }
+
+    #[inline]
+    pub fn push_cubic(&mut self, ctrl0: Vector2F, ctrl1: Vector2F, to: Vector2F) {
+        self.push_point(ctrl0, PointFlags::CONTROL_POINT_0, true);
+        self.push_point(ctrl1, PointFlags::CONTROL_POINT_1, true);
+        self.push_point(to, PointFlags::empty(), true);
     }
 
     fn transform(&mut self, transform: &Transform2F) {
@@ -732,7 +775,6 @@ struct Tile {
     tile_x: f32,
     tile_y: f32,
     alpha_tile_id: AlphaTileId,
-    path_id: f32,
     color: f32,
     ctrl: f32,
     backdrop: f32,
@@ -759,7 +801,7 @@ struct Tiler<'a> {
 }
 
 impl<'a> Tiler<'a> {
-    fn new(path_id: f32, outline: &'a Outline, view_box: RectF, paint_id: PaintId) -> Tiler<'a> {
+    fn new(outline: &'a Outline, view_box: RectF, paint_id: PaintId) -> Tiler<'a> {
         let bounds = outline.bounds.intersection(view_box).unwrap_or_default();
         let tile_bounds = round_rect_out_to_tile_bounds(bounds);
 
@@ -771,7 +813,6 @@ impl<'a> Tiler<'a> {
                     tile_x: x as f32,
                     tile_y: y as f32,
                     alpha_tile_id: AlphaTileId((!0u32).to_le_bytes().map(|v| v as f32)),
-                    path_id,
                     color: paint_id.0 as f32,
                     backdrop: 0.0,
                     ctrl: 0.0,
@@ -1233,7 +1274,7 @@ impl<'a> Renderer<'a> {
         let texture_metadata_texture = ctx.new_render_texture(TextureParams {
             width: TEXTURE_METADATA_TEXTURE_WIDTH,
             height: TEXTURE_METADATA_TEXTURE_HEIGHT,
-            format: TextureFormat::RGBA16F,
+            format: TextureFormat::RGBA8,
             ..Default::default()
         });
 
@@ -1348,7 +1389,6 @@ impl<'a> Renderer<'a> {
                 VertexAttribute::with_buffer("aTileOffset", VertexFormat::Float2, 0),
                 VertexAttribute::with_buffer("aTileOrigin", VertexFormat::Float2, 1),
                 VertexAttribute::with_buffer("aMaskTexCoord0", VertexFormat::Float4, 1),
-                VertexAttribute::with_buffer("aPathIndex", VertexFormat::Float1, 1),
                 VertexAttribute::with_buffer("aColor", VertexFormat::Float1, 1),
                 VertexAttribute::with_buffer("aCtrlBackdrop", VertexFormat::Float2, 1),
             ],
@@ -1373,7 +1413,7 @@ impl<'a> Renderer<'a> {
 
             viewport,
 
-            background_color: rgbu(77, 77, 82),
+            background_color: rgbu(116, 200, 214),
 
             tiles_vertex_indices_buffer: None,
             tiles_vertex_indices_length: 0,
@@ -1413,15 +1453,14 @@ impl<'a> Renderer<'a> {
         let palette = scene.colors.clone();
         self.upload_palette(&palette);
         let mut built_paths = vec![];
-        for path_index in 0..scene.paths.len() {
-            let path_object = &scene.paths[path_index];
+        for path_object in &scene.paths {
             let mut outline = path_object.outline.clone();
             outline.close_all_contours();
             outline.transform(&transform);
 
             let paint_id = path_object.paint_id;
 
-            let mut tiler = Tiler::new(path_index as f32, &outline, scene.view_box, paint_id);
+            let mut tiler = Tiler::new(&outline, scene.view_box, paint_id);
 
             tiler.generate_fills(scene.view_box, &mut next_alpha_tile_index);
             tiler.prepare_tiles();
@@ -1435,9 +1474,7 @@ impl<'a> Renderer<'a> {
         self.flush_fills();
 
         let mut tiles = vec![];
-        for path_id in 0..scene.paths.len() {
-            let cpu_data = &built_paths[path_id];
-
+        for cpu_data in &built_paths {
             for tile in &cpu_data.tiles {
                 if tile.alpha_tile_id == AlphaTileId((!0u32).to_le_bytes().map(|v| v as f32))
                     && tile.backdrop == 0.0
@@ -1462,30 +1499,25 @@ impl<'a> Renderer<'a> {
             (alignup_i32(metadata.len() as i32, entries_per_row) * texture_width * 4) as usize;
         let mut texels = Vec::with_capacity(padded_texel_size);
         for base_color in metadata {
-            let base_color = base_color.to_f32();
-
-            texels.extend_from_slice(&[
-                f16::from_f32(base_color.r()),
-                f16::from_f32(base_color.g()),
-                f16::from_f32(base_color.b()),
-                f16::from_f32(base_color.a()),
-            ]);
+            let texel = &[
+                base_color.r,
+                base_color.g,
+                base_color.b,
+                base_color.a,
+            ];
+            texels.extend_from_slice(texel);
         }
         while texels.len() < padded_texel_size {
-            texels.push(f16::default())
+            texels.push(u8::default())
         }
 
         let width = TEXTURE_METADATA_TEXTURE_WIDTH;
         let height = texels.len() as u32 / (4 * TEXTURE_METADATA_TEXTURE_WIDTH);
-        let texels_u8: Vec<u8> = texels
-            .iter()
-            .flat_map(|&f| f.to_f32().to_bits().to_le_bytes())
-            .collect();
         self.ctx.texture_resize(
             self.texture_metadata_texture,
             width,
             height,
-            Some(&texels_u8),
+            Some(&texels),
         );
     }
 
@@ -1709,16 +1741,30 @@ fn push_color(scene: &mut Scene, base_color: &ColorU) -> PaintId {
 fn draw_eyes(
     scene: &mut Scene,
     transform: &Transform2F,
-    rect: RectF,
+    framebuffer_size: (f32, f32),
+    hidpi_factor: f32,
     mouse_position: Vector2F,
     time: f64,
 ) {
     // let time: f64 = 0.0;
     // let mouse_position = Vector2F::new(0.0, 0.0);
-    let eyes_radii = rect.size() * vec2f(0.23, 0.5);
-    let eyes_left_position = rect.origin() + eyes_radii;
-    let eyes_right_position = rect.origin() + vec2f(rect.width() - eyes_radii.x(), eyes_radii.y());
-    let eyes_center = f32::min(eyes_radii.x(), eyes_radii.y()) * 0.5;
+    let eyes_rect =
+    RectF::new(
+        vec2f(
+            framebuffer_size.0 as f32 / hidpi_factor as f32 / 2.
+                - ((framebuffer_size.0 * 0.9) / 4.0) as f32,
+            framebuffer_size.1 as f32 / hidpi_factor as f32 / 2.
+                - ((framebuffer_size.1 * 0.9) / 4.0) as f32,
+        ),
+        vec2f(
+            ((framebuffer_size.0 * 0.9) / 2.0) as f32,
+            ((framebuffer_size.1 * 0.9) / 2.0) as f32,
+        ),
+    );
+    let eyes_radii = eyes_rect.size() * vec2f(0.23, 0.35);
+    let eyes_left_position = eyes_rect.origin() + eyes_radii;
+    let eyes_right_position = eyes_rect.origin() + vec2f(eyes_rect.width() - eyes_radii.x(), eyes_radii.y());
+    let eyes_center = f32::min(eyes_radii.x(), eyes_radii.y()) * 0.4;
     let blink = (1.0 - f64::powf((time * 0.5).sin(), 200.0) * 0.8) as f32;
 
     let mut path = Path2D::new();
@@ -1743,6 +1789,65 @@ fn draw_eyes(
     path.ellipse(
         eyes_right_position + delta + vec2f(0.0, eyes_radii.y() * 0.25 * (1.0 - blink)),
         vec2f(eyes_center, eyes_center * blink),
+        0.0,
+        0.0,
+        PI_2,
+    );
+    push_path(scene, transform, path, &rgbu(32, 32, 32));
+
+    let mut path = Path2D::new();
+    path.ellipse(
+        eyes_left_position + delta + vec2f(eyes_center * 0.5, eyes_radii.y() * 0.25 * (1.0 - blink) + eyes_center * 0.75 * (blink - 0.5)),
+        vec2f(eyes_center * 0.2, eyes_center * 0.25),
+        0.0,
+        0.0,
+        PI_2,
+    );
+    path.ellipse(
+        eyes_right_position + delta + vec2f(eyes_center * 0.5, eyes_radii.y() * 0.25 * (1.0 - blink) + eyes_center * 0.75 * (blink - 0.5)),
+        vec2f(eyes_center * 0.2, eyes_center * 0.25),
+        0.0,
+        0.0,
+        PI_2,
+    );
+    push_path(scene, transform, path, &rgbu(220, 220, 220));
+
+    let mut path = Path2D::new();
+    let tooth_pos = vec2f(framebuffer_size.0 / hidpi_factor as f32, framebuffer_size.1 / hidpi_factor as f32) * vec2f(0.45, 0.83);
+    path.move_to(tooth_pos);
+    path.line_to(tooth_pos * vec2f(1.0, 1.1));
+    path.bezier_curve_to(tooth_pos * vec2f(1.0, 1.15), tooth_pos * vec2f(1.1, 1.15), tooth_pos * vec2f(1.1, 1.1));
+    path.line_to(tooth_pos * vec2f(1.1, 1.0));
+    path.close_path();
+    push_path(scene, transform, path, &rgbu(220, 220, 220));
+
+    let mut path = Path2D::new();
+    let tooth_pos = vec2f(framebuffer_size.0 / hidpi_factor as f32, framebuffer_size.1 / hidpi_factor as f32) * vec2f(0.5, 0.83);
+    path.move_to(tooth_pos);
+    path.line_to(tooth_pos * vec2f(1.0, 1.1));
+    path.bezier_curve_to(tooth_pos * vec2f(1.0, 1.15), tooth_pos * vec2f(1.1, 1.15), tooth_pos * vec2f(1.1, 1.1));
+    path.line_to(tooth_pos * vec2f(1.1, 1.0));
+    path.close_path();
+    push_path(scene, transform, path, &rgbu(220, 220, 220));
+
+    let mut path = Path2D::new();
+    let mouth_pos = vec2f(framebuffer_size.0 / hidpi_factor as f32, framebuffer_size.1 / hidpi_factor as f32) * vec2f(0.68, 0.75);
+    path.move_to(mouth_pos);
+    path.bezier_curve_to(mouth_pos * vec2f(0.85, 0.85), mouth_pos * vec2f(0.65, 0.85), mouth_pos * vec2f(0.5, 1.0));
+    path.bezier_curve_to(mouth_pos * vec2f(0.43, 1.08), mouth_pos * vec2f(0.43, 1.16), mouth_pos * vec2f(0.5, 1.2));
+    path.bezier_curve_to(mouth_pos * vec2f(0.5, 1.21), mouth_pos * vec2f(0.6, 1.21), mouth_pos * vec2f(0.65, 1.15));
+    path.bezier_curve_to(mouth_pos * vec2f(0.65, 1.15), mouth_pos * vec2f(0.75, 1.07), mouth_pos * vec2f(0.85, 1.15));
+    path.bezier_curve_to(mouth_pos * vec2f(0.9, 1.17), mouth_pos * vec2f(0.95, 1.2), mouth_pos * vec2f(1.0, 1.2));
+    path.bezier_curve_to(mouth_pos * vec2f(1.09, 1.15), mouth_pos * vec2f(1.05, 1.05), mouth_pos * vec2f(1.0, 1.0));
+    path.close_path();
+    push_path(scene, transform, path, &rgbu(246, 210, 165));
+
+
+    let mut path = Path2D::new();
+    let nose_pos = vec2f(framebuffer_size.0 / hidpi_factor as f32, framebuffer_size.1 / hidpi_factor as f32) * vec2f(0.5, 0.7);
+    path.ellipse(
+        nose_pos,
+        vec2f(eyes_center, eyes_center * 0.7),
         0.0,
         0.0,
         PI_2,
@@ -1790,18 +1895,8 @@ async fn main() {
         draw_eyes(
             &mut canvas_scene,
             &transform,
-            RectF::new(
-                vec2f(
-                    framebuffer_size.0 as f32 / hidpi_factor as f32 / 2.
-                        - ((framebuffer_size.0 - 100.0) / 4.0) as f32,
-                    framebuffer_size.1 as f32 / hidpi_factor as f32 / 2.
-                        - ((framebuffer_size.1 - 100.0) / 4.0) as f32,
-                ),
-                vec2f(
-                    ((framebuffer_size.0 - 100.0) / 2.0) as f32,
-                    ((framebuffer_size.1 - 100.0) / 2.0) as f32,
-                ),
-            ),
+            framebuffer_size,
+            hidpi_factor,
             Vector2F::new(cursor_position.0, cursor_position.1),
             frame_start_elapsed_time,
         );
