@@ -1,6 +1,14 @@
 Macroquad tamogotchi little game
 ===
 
+On this branch I'm stealing [pathfinder's](https://github.com/servo/pathfinder) code
+to render pixel perfect curves using macroquad
+
+To check current progress just run
+```
+cargo run
+```
+
 You will raise a birds in this game. Probably will add something like motivation tracking (like habitica) or similar kind of stuff.
 I try to use lottie animations in there. I wanted to use lottie-rs but there are too much dependencies. I hope I can make my own renderer not complex and able to render stuff that I animate in Synfig/Glaxnimate
 
