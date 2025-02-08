@@ -12,7 +12,7 @@ build_targets = ["armv7-linux-androideabi"]
 [dependencies]
 # macroquad = { path = "../macroquad" }
 # macroquad = "0.4"
-macroquad = { git = "https://github.com/not-fl3/macroquad", rev = "b6f43bb868e776540ef8ebebd10299f1aac1c06c"}
+macroquad = { version = "0.4.13", git = "https://github.com/not-fl3/macroquad", rev = "b6f43bb868e776540ef8ebebd10299f1aac1c06c"}
 
 geometric_algebra = "0.3.0"
 ttf-parser = { version = "0.14.0" }
@@ -31,14 +31,16 @@ nanoserde = {git = "https://github.com/not-fl3/nanoserde", default-features = fa
 usvg = "0.44.0"
 tiny-skia-path = "0.11.4"
 
-mqpf = { path = "../mqpf" }
+# mqpf = "0.1.1"
+mqpf = { git = "https://github.com/birhburh/mqpf" }
+# mqpf = {path = "../mqpf"}
 half = "1.5"
 pathfinder_geometry = "0.5.1"
 
 [patch.crates-io]
 # miniquad = { path="../miniquad", features = ["log-impl"] }
-miniquad = { git = "https://github.com/birhburh/miniquad", branch = "clear_vertex_attributes_fix"}
-# miniquad = { git = "https://github.com/not-fl3/miniquad" }
+# miniquad = { git = "https://github.com/birhburh/miniquad", branch = "clear_vertex_attributes_fix"}
+miniquad = { version = "0.4.7", git = "https://github.com/not-fl3/miniquad", rev = "ec99dab891d21bc664957afdc3e743942b7c4926" }
 
 [profile.release]
 lto = true

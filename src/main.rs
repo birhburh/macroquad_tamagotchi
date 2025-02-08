@@ -203,7 +203,7 @@ async fn main() {
     let hidpi_factor = dpi_scale();
 
     let context = unsafe { get_internal_gl().quad_context };
-    let mut renderer = Renderer::new(context, framebuffer_size);
+    let mut renderer = Renderer::new(context, framebuffer_size, color_u8!(116, 200, 214, 255));
 
     let mut saved_width = 0.0;
     let mut saved_height = 0.0;
