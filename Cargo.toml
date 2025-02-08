@@ -1,3 +1,7 @@
+[workspace]
+
+members = ["mqpf"]
+
 [package]
 name = "macroquad_tamagotchi"
 version = "0.1.0"
@@ -31,20 +35,9 @@ nanoserde = {git = "https://github.com/not-fl3/nanoserde", default-features = fa
 usvg = "0.44.0"
 tiny-skia-path = "0.11.4"
 
-# dependencies for pathfinder code
-bitflags = "1.0"
+mqpf = { path = "mqpf" }
 half = "1.5"
-
-[dependencies.pathfinder_geometry]
-version = "0.5.1"
-
-[dependencies.pathfinder_simd]
-version = "0.5.4"
-
-[dependencies.image]
-version = "0.23"
-default-features = false
-features = ["png"]
+pathfinder_geometry = "0.5.1"
 
 [patch.crates-io]
 # miniquad = { path="../miniquad", features = ["log-impl"] }
