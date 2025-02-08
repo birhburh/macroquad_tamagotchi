@@ -1,7 +1,3 @@
-[workspace]
-
-members = ["mqpf"]
-
 [package]
 name = "macroquad_tamagotchi"
 version = "0.1.0"
@@ -35,7 +31,7 @@ nanoserde = {git = "https://github.com/not-fl3/nanoserde", default-features = fa
 usvg = "0.44.0"
 tiny-skia-path = "0.11.4"
 
-mqpf = { path = "mqpf" }
+mqpf = { path = "../mqpf" }
 half = "1.5"
 pathfinder_geometry = "0.5.1"
 
