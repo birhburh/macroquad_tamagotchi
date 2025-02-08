@@ -1248,7 +1248,7 @@ impl<'a> Renderer<'a> {
         );
 
         let image = image::load_from_memory_with_format(
-            include_bytes!("../../assets/area-lut.png"),
+            include_bytes!("../textures/area-lut.png"),
             image::ImageFormat::Png,
         )
         .unwrap();
@@ -1281,8 +1281,8 @@ impl<'a> Renderer<'a> {
             .new_shader(
                 match ctx.info().backend {
                     Backend::OpenGl => ShaderSource::Glsl {
-                        vertex: include_str!("../../shaders/fill.vs.glsl"),
-                        fragment: include_str!("../../shaders/fill.fs.glsl"),
+                        vertex: include_str!("../shaders/fill.vs.glsl"),
+                        fragment: include_str!("../shaders/fill.fs.glsl"),
                     },
                     Backend::Metal => todo!(),
                 },
@@ -1338,8 +1338,8 @@ impl<'a> Renderer<'a> {
             .new_shader(
                 match ctx.info().backend {
                     Backend::OpenGl => ShaderSource::Glsl {
-                        vertex: include_str!("../../shaders/tile.vs.glsl"),
-                        fragment: include_str!("../../shaders/tile.fs.glsl"),
+                        vertex: include_str!("../shaders/tile.vs.glsl"),
+                        fragment: include_str!("../shaders/tile.fs.glsl"),
                     },
                     Backend::Metal => todo!(),
                 },
