@@ -27,15 +27,12 @@ nanoserde = {git = "https://github.com/not-fl3/nanoserde", default-features = fa
 # serde = { version = "1.0", features = ["derive"] }
 # serde_json = "1.0"
 
-# dependencies for ochre code
-usvg = "0.44.0"
-tiny-skia-path = "0.11.4"
-
 # mqpf = "0.1.1"
-mqpf = { git = "https://github.com/birhburh/mqpf" }
+mqpf = { git = "https://github.com/birhburh/mqpf", branch = "main"}
 # mqpf = {path = "../mqpf"}
-half = "1.5"
-pathfinder_geometry = "0.5.1"
+
+usvg = "0.44.0"
+bitflags = "1.0"
 
 [patch.crates-io]
 # miniquad = { path="../miniquad", features = ["log-impl"] }
