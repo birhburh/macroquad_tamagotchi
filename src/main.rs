@@ -5,16 +5,15 @@ use {
             window::{dpi_scale, screen_size},
         },
         prelude::*,
-    },
-    mqpf::{
-        push_path, ArcDirection, Contour, LineSegment, Outline, Path2D, PushSegmentFlags, Renderer,
+    }, mqpf::{
+        push_path, ArcDirection, Contour, Outline, Path2D, PushSegmentFlags, Renderer,
         Scene, Segment, SegmentFlags,
-    },
-    std::mem,
-    usvg::{
+    }, pathfinder_geometry::{
+        line_segment::LineSegment2F, rect::RectF, transform2d::{Matrix2x2F, Transform2F}, vector::{vec2f, Vector2F}
+    }, std::mem, usvg::{
         tiny_skia_path::{PathSegment, Point},
         LineCap as UsvgLineCap, LineJoin as UsvgLineJoin, Tree as SvgTree,
-    },
+    }
 };
 
 fn window_conf() -> Conf {
@@ -45,8 +44,8 @@ where
     I: Iterator<Item = PathSegment>,
 {
     iter: I,
-    first_subpath_point: Vec2,
-    last_subpath_point: Vec2,
+    first_subpath_point: Vector2F,
+    last_subpath_point: Vector2F,
     just_moved: bool,
 }
 
@@ -57,8 +56,8 @@ where
     fn new(iter: I) -> UsvgPathToSegments<I> {
         UsvgPathToSegments {
             iter,
-            first_subpath_point: Vec2::ZERO,
-            last_subpath_point: Vec2::ZERO,
+            first_subpath_point: Vector2F::zero(),
+            last_subpath_point: Vector2F::zero(),
             just_moved: false,
         }
     }
@@ -73,15 +72,15 @@ where
     fn next(&mut self) -> Option<Segment> {
         match self.iter.next()? {
             PathSegment::MoveTo(Point { x, y }) => {
-                let to = vec2(x as f32, y as f32);
+                let to = vec2f(x as f32, y as f32);
                 self.first_subpath_point = to;
                 self.last_subpath_point = to;
                 self.just_moved = true;
                 self.next()
             }
             PathSegment::LineTo(Point { x, y }) => {
-                let to = vec2(x as f32, y as f32);
-                let mut segment = Segment::line(LineSegment::new(self.last_subpath_point, to));
+                let to = vec2f(x as f32, y as f32);
+                let mut segment = Segment::line(LineSegment2F::new(self.last_subpath_point, to));
                 if self.just_moved {
                     segment.flags.insert(SegmentFlags::FIRST_IN_SUBPATH);
                 }
@@ -94,12 +93,12 @@ where
                 Point { x: x2, y: y2 },
                 Point { x, y },
             ) => {
-                let ctrl0 = vec2(x1 as f32, y1 as f32);
-                let ctrl1 = vec2(x2 as f32, y2 as f32);
-                let to = vec2(x as f32, y as f32);
+                let ctrl0 = vec2f(x1 as f32, y1 as f32);
+                let ctrl1 = vec2f(x2 as f32, y2 as f32);
+                let to = vec2f(x as f32, y as f32);
                 let mut segment = Segment::cubic(
-                    LineSegment::new(self.last_subpath_point, to),
-                    LineSegment::new(ctrl0, ctrl1),
+                    LineSegment2F::new(self.last_subpath_point, to),
+                    LineSegment2F::new(ctrl0, ctrl1),
                 );
                 if self.just_moved {
                     segment.flags.insert(SegmentFlags::FIRST_IN_SUBPATH);
@@ -109,10 +108,10 @@ where
                 Some(segment)
             }
             PathSegment::QuadTo(Point { x: x1, y: y1 }, Point { x: x2, y: y2 }) => {
-                let ctrl = vec2(x1 as f32, y1 as f32);
-                let to = vec2(x2 as f32, y2 as f32);
+                let ctrl = vec2f(x1 as f32, y1 as f32);
+                let to = vec2f(x2 as f32, y2 as f32);
                 let mut segment =
-                    Segment::quadratic(LineSegment::new(self.last_subpath_point, to), ctrl);
+                    Segment::quadratic(LineSegment2F::new(self.last_subpath_point, to), ctrl);
                 if self.just_moved {
                     segment.flags.insert(SegmentFlags::FIRST_IN_SUBPATH);
                 }
@@ -121,7 +120,7 @@ where
                 Some(segment)
             }
             PathSegment::Close => {
-                let mut segment = Segment::line(LineSegment::new(
+                let mut segment = Segment::line(LineSegment2F::new(
                     self.last_subpath_point,
                     self.first_subpath_point,
                 ));
@@ -356,8 +355,8 @@ trait AddJoin {
         &mut self,
         distance: f32,
         join: LineJoin,
-        join_point: Vec2,
-        next_tangent: LineSegment,
+        join_point: Vector2F,
+        next_tangent: LineSegment2F,
     );
 }
 
@@ -377,11 +376,11 @@ impl AddJoin for Contour {
         &mut self,
         distance: f32,
         join: LineJoin,
-        join_point: Vec2,
-        next_tangent: LineSegment,
+        join_point: Vector2F,
+        next_tangent: LineSegment2F,
     ) {
         let (p0, p1) = (self.position_of_last(2), self.position_of_last(1));
-        let prev_tangent = LineSegment::new(p0, p1);
+        let prev_tangent = LineSegment2F::new(p0, p1);
 
         if prev_tangent.square_length() < EPSILON || next_tangent.square_length() < EPSILON {
             return;
@@ -396,7 +395,7 @@ impl AddJoin for Contour {
                     }
                     let miter_endpoint = prev_tangent.sample(prev_tangent_t);
                     let threshold = miter_limit * distance;
-                    if (miter_endpoint - join_point).length_squared() > threshold * threshold {
+                    if (miter_endpoint - join_point).square_length() > threshold * threshold {
                         return;
                     }
                     self.push_endpoint(miter_endpoint);
@@ -404,11 +403,10 @@ impl AddJoin for Contour {
             }
             LineJoin::Round => {
                 let scale = distance.abs();
-                let transform =
-                    Affine2::from_scale_angle_translation(vec2(scale, scale), 0.0, join_point);
+                let transform = Transform2F::from_scale(scale).translate(join_point);
                 let chord_from = (prev_tangent.to() - join_point).normalize();
                 let chord_to = (next_tangent.to() - join_point).normalize();
-                let chord = LineSegment::new(chord_from, chord_to);
+                let chord = LineSegment2F::new(chord_from, chord_to);
                 self.push_arc_from_unit_chord(&transform, chord, ArcDirection::CW);
             }
         }
@@ -421,7 +419,7 @@ trait Offset {
         &self,
         distance: f32,
         join: LineJoin,
-        join_point: Vec2,
+        join_point: Vector2F,
         contour: &mut Contour,
     );
     fn offset_once(&self, distance: f32) -> Self;
@@ -451,7 +449,7 @@ impl Offset for Segment {
         &self,
         distance: f32,
         join: LineJoin,
-        join_point: Vec2,
+        join_point: Vector2F,
         contour: &mut Contour,
     ) {
         // Add join if necessary.
@@ -465,7 +463,7 @@ impl Offset for Segment {
                 self.ctrl.from()
             };
 
-            contour.add_join(distance, join, join_point, LineSegment::new(p4, p3));
+            contour.add_join(distance, join, join_point, LineSegment2F::new(p4, p3));
         }
 
         // Push segment.
@@ -479,51 +477,51 @@ impl Offset for Segment {
         }
 
         if self.is_quadratic() {
-            let mut segment_0 = LineSegment::new(self.baseline.from(), self.ctrl.from());
-            let mut segment_1 = LineSegment::new(self.ctrl.from(), self.baseline.to());
+            let mut segment_0 = LineSegment2F::new(self.baseline.from(), self.ctrl.from());
+            let mut segment_1 = LineSegment2F::new(self.ctrl.from(), self.baseline.to());
             segment_0 = segment_0.offset(distance);
             segment_1 = segment_1.offset(distance);
             let ctrl = match segment_0.intersection_t(segment_1) {
                 Some(t) => segment_0.sample(t),
                 None => segment_0.to().lerp(segment_1.from(), 0.5),
             };
-            let baseline = LineSegment::new(segment_0.from(), segment_1.to());
+            let baseline = LineSegment2F::new(segment_0.from(), segment_1.to());
             return Segment::quadratic(baseline, ctrl);
         }
 
         debug_assert!(self.is_cubic());
 
         if self.baseline.from() == self.ctrl.from() {
-            let mut segment_0 = LineSegment::new(self.baseline.from(), self.ctrl.to());
-            let mut segment_1 = LineSegment::new(self.ctrl.to(), self.baseline.to());
+            let mut segment_0 = LineSegment2F::new(self.baseline.from(), self.ctrl.to());
+            let mut segment_1 = LineSegment2F::new(self.ctrl.to(), self.baseline.to());
             segment_0 = segment_0.offset(distance);
             segment_1 = segment_1.offset(distance);
             let ctrl = match segment_0.intersection_t(segment_1) {
                 Some(t) => segment_0.sample(t),
                 None => segment_0.to().lerp(segment_1.from(), 0.5),
             };
-            let baseline = LineSegment::new(segment_0.from(), segment_1.to());
-            let ctrl = LineSegment::new(segment_0.from(), ctrl);
+            let baseline = LineSegment2F::new(segment_0.from(), segment_1.to());
+            let ctrl = LineSegment2F::new(segment_0.from(), ctrl);
             return Segment::cubic(baseline, ctrl);
         }
 
         if self.ctrl.to() == self.baseline.to() {
-            let mut segment_0 = LineSegment::new(self.baseline.from(), self.ctrl.from());
-            let mut segment_1 = LineSegment::new(self.ctrl.from(), self.baseline.to());
+            let mut segment_0 = LineSegment2F::new(self.baseline.from(), self.ctrl.from());
+            let mut segment_1 = LineSegment2F::new(self.ctrl.from(), self.baseline.to());
             segment_0 = segment_0.offset(distance);
             segment_1 = segment_1.offset(distance);
             let ctrl = match segment_0.intersection_t(segment_1) {
                 Some(t) => segment_0.sample(t),
                 None => segment_0.to().lerp(segment_1.from(), 0.5),
             };
-            let baseline = LineSegment::new(segment_0.from(), segment_1.to());
-            let ctrl = LineSegment::new(ctrl, segment_1.to());
+            let baseline = LineSegment2F::new(segment_0.from(), segment_1.to());
+            let ctrl = LineSegment2F::new(ctrl, segment_1.to());
             return Segment::cubic(baseline, ctrl);
         }
 
-        let mut segment_0 = LineSegment::new(self.baseline.from(), self.ctrl.from());
-        let mut segment_1 = LineSegment::new(self.ctrl.from(), self.ctrl.to());
-        let mut segment_2 = LineSegment::new(self.ctrl.to(), self.baseline.to());
+        let mut segment_0 = LineSegment2F::new(self.baseline.from(), self.ctrl.from());
+        let mut segment_1 = LineSegment2F::new(self.ctrl.from(), self.ctrl.to());
+        let mut segment_2 = LineSegment2F::new(self.ctrl.to(), self.baseline.to());
         segment_0 = segment_0.offset(distance);
         segment_1 = segment_1.offset(distance);
         segment_2 = segment_2.offset(distance);
@@ -537,8 +535,8 @@ impl Offset for Segment {
                 segment_1.to().lerp(segment_2.from(), 0.5),
             ),
         };
-        let baseline = LineSegment::new(segment_0.from(), segment_2.to());
-        let ctrl = LineSegment::new(ctrl_0, ctrl_1);
+        let baseline = LineSegment2F::new(segment_0.from(), segment_2.to());
+        let ctrl = LineSegment2F::new(ctrl_0, ctrl_1);
         Segment::cubic(baseline, ctrl)
     }
 
@@ -555,7 +553,7 @@ impl Offset for Segment {
             // FIXME(pcwalton): Use signed distance!
             let (this_p, other_p) = (self.sample(t), other.sample(t));
             let vector = this_p - other_p;
-            let square_distance = vector.length_squared();
+            let square_distance = vector.square_length();
             if square_distance < min || square_distance > max {
                 return false;
             }
@@ -693,7 +691,7 @@ impl<'a> OutlineStrokeToFill<'a> {
         // Add join if necessary.
         if closed && stroker.output.might_need_join(self.style.line_join) {
             let (p1, p0) = (stroker.output.position_of(1), stroker.output.position_of(0));
-            let final_segment = LineSegment::new(p1, p0);
+            let final_segment = LineSegment2F::new(p1, p0);
             stroker.output.add_join(
                 self.style.line_width * 0.5,
                 self.style.line_join,
@@ -719,7 +717,7 @@ impl<'a> OutlineStrokeToFill<'a> {
         let mut p0_index = contour.len() - 2;
         loop {
             p0 = contour.position_of(p0_index);
-            if (p1 - p0).length_squared() > EPSILON {
+            if (p1 - p0).square_length() > EPSILON {
                 break;
             }
             if p0_index == 0 {
@@ -736,7 +734,7 @@ impl<'a> OutlineStrokeToFill<'a> {
                 let offset = gradient * (width * 0.5);
 
                 let p2 = p1 + offset;
-                let p3 = p2 + gradient.yx() * vec2(-width, width);
+                let p3 = p2 + gradient.yx() * vec2f(-width, width);
                 let p4 = p3 - offset;
 
                 contour.push_endpoint(p2);
@@ -746,11 +744,10 @@ impl<'a> OutlineStrokeToFill<'a> {
 
             LineCap::Round => {
                 let scale = width * 0.5;
-                let offset = gradient.yx() * vec2(-1.0, 1.0);
+                let offset = gradient.yx() * vec2f(-1.0, 1.0);
                 let translation = p1 + offset * (width * 0.5);
-                let transform =
-                    Affine2::from_scale_angle_translation(vec2(scale, scale), 0.0, translation);
-                let chord = LineSegment::new(-offset, offset);
+                let transform = Transform2F::from_scale(scale).translate(translation);
+                let chord = LineSegment2F::new(-offset, offset);
                 contour.push_arc_from_unit_chord(&transform, chord, ArcDirection::CW);
             }
         }
@@ -762,25 +759,25 @@ fn load_scene() -> SvgTree {
     SvgTree::from_data(svg_data, &usvg::Options::default()).unwrap()
 }
 
-fn render_node(node: &usvg::Node, scene: &mut Scene, global_transform: Affine2) {
+fn render_node(node: &usvg::Node, scene: &mut Scene, global_transform: Transform2F) {
     match node {
         usvg::Node::Path(ref p) => {
             let t = node.abs_transform();
             let mut transform = global_transform;
 
-            transform *= Affine2::from_mat2_translation(
-                Mat2::from_cols_array(&[t.sx as f32, t.ky as f32, t.kx as f32, t.sy as f32]),
-                vec2(t.tx as f32, t.ty as f32),
-            );
+            transform *= Transform2F {
+                matrix: Matrix2x2F::row_major(t.sx, t.ky, t.kx, t.sy),
+                vector: Vector2F::new(t.tx, t.ty),
+            };
 
             let mut path = Path2D::new();
             for segment in p.data().segments() {
                 match segment {
                     PathSegment::MoveTo(Point { x, y }) => {
-                        path.move_to(vec2(x as f32, y as f32));
+                        path.move_to(vec2f(x as f32, y as f32));
                     }
                     PathSegment::LineTo(Point { x, y }) => {
-                        path.line_to(vec2(x as f32, y as f32));
+                        path.line_to(vec2f(x as f32, y as f32));
                     }
                     PathSegment::CubicTo(
                         Point { x: x1, y: y1 },
@@ -788,15 +785,15 @@ fn render_node(node: &usvg::Node, scene: &mut Scene, global_transform: Affine2) 
                         Point { x, y },
                     ) => {
                         path.bezier_curve_to(
-                            vec2(x1 as f32, y1 as f32),
-                            vec2(x2 as f32, y2 as f32),
-                            vec2(x as f32, y as f32),
+                            vec2f(x1 as f32, y1 as f32),
+                            vec2f(x2 as f32, y2 as f32),
+                            vec2f(x as f32, y as f32),
                         );
                     }
                     PathSegment::QuadTo(Point { x: x1, y: y1 }, Point { x: x2, y: y2 }) => {
                         path.quadratic_curve_to(
-                            vec2(x1 as f32, y1 as f32),
-                            vec2(x2 as f32, y2 as f32),
+                            vec2f(x1 as f32, y1 as f32),
+                            vec2f(x2 as f32, y2 as f32),
                         );
                     }
                     PathSegment::Close => {
@@ -859,7 +856,7 @@ fn render_node(node: &usvg::Node, scene: &mut Scene, global_transform: Affine2) 
     }
 }
 
-fn render_nodes(group: &usvg::Group, scene: &mut Scene, global_transform: Affine2) {
+fn render_nodes(group: &usvg::Group, scene: &mut Scene, global_transform: Transform2F) {
     for child in group.children() {
         render_node(&child, scene, global_transform);
     }
@@ -890,10 +887,10 @@ async fn main() {
         }
 
         let mut canvas_scene = Scene {
-            view_box: Rect::new(0.0, 0.0, framebuffer_size.0, framebuffer_size.1),
+            view_box: RectF::new(vec2f(0.0, 0.0), vec2f(framebuffer_size.0, framebuffer_size.1)),
             ..Default::default()
         };
-        let transform = Affine2::from_scale(vec2(hidpi_factor, hidpi_factor));
+        let transform = Transform2F::from_scale(hidpi_factor);
 
         let side_size = tree.size().width().min(tree.size().height());
         let mut scale = if screen_width() < screen_height() {
@@ -902,11 +899,11 @@ async fn main() {
             screen_height() / side_size * 0.9
         };
 
-        let mut transform = Affine2::from_translation(Vec2::from_array([
+        let mut transform = Transform2F::from_translation(vec2f(
             screen_width() / 2.0 - side_size * scale / 2.0,
             screen_height() / 2.0 - side_size * scale / 2.0,
-        ]));
-        transform *= Affine2::from_scale(vec2(scale, scale));
+        ));
+        transform *= Transform2F::from_scale(vec2f(scale, scale));
 
         render_nodes(&tree.root(), &mut canvas_scene, transform);
 

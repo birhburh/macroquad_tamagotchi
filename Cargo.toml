@@ -28,8 +28,9 @@ nanoserde = {git = "https://github.com/not-fl3/nanoserde", default-features = fa
 # serde_json = "1.0"
 
 # mqpf = "0.1.1"
-# mqpf = { git = "https://github.com/birhburh/mqpf" }
-mqpf = {path = "../mqpf"}
+mqpf = { git = "https://github.com/birhburh/mqpf", branch = "simd_svg_test"}
+# mqpf = {path = "../mqpf"}
+pathfinder_geometry = "0.5.1"
 
 usvg = "0.44.0"
 bitflags = "1.0"
